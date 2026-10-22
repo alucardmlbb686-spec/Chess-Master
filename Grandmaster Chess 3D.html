@@ -34,9 +34,24 @@ button:disabled{opacity:.55;cursor:default}
 #cap{font-size:18px;min-height:22px;letter-spacing:1px}
 #moves{font:12px ui-monospace,monospace;color:var(--mut);max-height:120px;overflow:auto;display:grid;grid-template-columns:28px 1fr 1fr;gap:2px 6px}
 #hud{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));font-size:11px;color:var(--mut);text-align:right;max-width:60%}
-@media(max-width:640px){.panel{width:auto;right:12px;max-height:42%}}
+@media(max-width:640px){
+ .panel{left:8px;right:8px;top:calc(8px + env(safe-area-inset-top,0px));width:auto;max-width:none;max-height:min(48dvh,380px);padding:12px;border-radius:16px}
+ .row{gap:8px;margin:8px 0}
+ button,input{min-height:42px}
+ #moves{max-height:76px}
+ #hud{right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+ #gamePanel.game-active{max-height:min(35dvh,230px);padding:9px 12px}
+ #gamePanel.game-active h1,#gamePanel.game-active>.sub{display:none}
+ #gamePanel.game-active #status{margin:0;padding:7px 9px}
+ #gamePanel.game-active #moves{max-height:42px}
+ #gamePanel.game-active #cap{min-height:18px;font-size:16px}
+ #gamePanel.game-active #gameActions{display:flex;gap:6px;margin:6px 0 0}
+ #gamePanel.game-active #gameActions button{flex:1;min-width:0;padding:8px 6px;font-size:12px}
+}
 #gamePanel.coach-view{left:auto;right:12px}
+#gamePanel.game-active .lobby-controls{display:none}
 @media(max-width:640px){#gamePanel.coach-view{left:12px;right:12px;top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));max-height:34%}}
+#gamePanel.game-active #menuBtn{display:none}
 #menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,10,.72);backdrop-filter:blur(8px);z-index:5;padding:16px;box-sizing:border-box}
 #menu.hide{display:none}
 #gameResult{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,10,.72);backdrop-filter:blur(6px);z-index:6;padding:16px;box-sizing:border-box}
@@ -63,16 +78,16 @@ button:disabled{opacity:.55;cursor:default}
 </style></head><body>
 <div class="panel" id="gamePanel">
 <h1>♞ Grandmaster Chess 3D</h1><div class="sub">Real-time multiplayer · physically based rendering</div>
-<div class="row"><button id="hostRoom">Host room</button><button class="g" id="create">Quick match</button></div>
-<div class="row"><input id="roomCode" maxlength="6" placeholder="ROOM CODE" aria-label="Room code"><button class="g" id="joinRoom">Join room</button></div>
-<div class="row"><button class="g" id="cancelSearch" disabled>Cancel search</button><span id="roomInvite" class="profile-chip"></span></div>
-<div class="row"><button class="g" id="practice">Practice</button><span id="profileSummary" class="profile-chip"></span></div>
-<div class="row"><input id="rewardCode" maxlength="24" placeholder="Reward code" aria-label="Reward code"><button class="g" id="redeemCode">Redeem</button></div>
+<div class="row lobby-controls"><button id="hostRoom">Host room</button><button class="g" id="create">Quick match</button></div>
+<div class="row lobby-controls"><input id="roomCode" maxlength="6" placeholder="ROOM CODE" aria-label="Room code"><button class="g" id="joinRoom">Join room</button></div>
+<div class="row lobby-controls"><button class="g" id="cancelSearch" disabled>Cancel search</button><span id="roomInvite" class="profile-chip"></span></div>
+<div class="row lobby-controls"><button class="g" id="practice">Practice</button><span id="profileSummary" class="profile-chip"></span></div>
+<div class="row lobby-controls"><input id="rewardCode" maxlength="24" placeholder="Reward code" aria-label="Reward code"><button class="g" id="redeemCode">Redeem</button></div>
 <div id="coachPanel" hidden><strong>Grandmaster coach unlocked</strong><p>Single-player hints only · Hard engine · depth 4</p><div class="row"><button id="coachHint">Find best move</button><button class="g" id="playCoachMove" disabled>Play suggested move</button></div>
 <div class="row"><button class="g" id="playCoachBot">Play the hard bot</button><button class="g" id="clearCoach">Clear arrow</button></div><div id="coachAdvice" role="status" aria-live="polite"></div></div>
 <div id="status">Choose a mode to begin</div>
 <div id="cap"></div><div id="moves"></div>
-<div class="row"><button class="g" id="menuBtn">☰ Menu</button><button class="g" id="flip">Flip</button><button class="g" id="reset">Restart</button><button class="g" id="resign">Resign</button></div>
+<div class="row" id="gameActions"><button class="g" id="menuBtn">☰ Menu</button><button class="g" id="flip">Flip</button><button class="g" id="reset">Restart</button><button class="g" id="resign">Resign</button></div>
 </div>
 <svg id="coachOverlay" hidden aria-hidden="true"><defs><marker id="coachArrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#22ff66" stroke="#fff" stroke-width="0.6"/></marker></defs><line id="coachLine"/><circle id="coachStart" r="8"/><circle id="coachEnd" r="10"/><circle id="coachTargetLabel" r="17"/><text id="coachTargetText" text-anchor="middle" dominant-baseline="central"></text></svg>
 <div id="gameResult" hidden role="dialog" aria-modal="true" aria-labelledby="resultTitle"><div class="card"><h2 id="resultTitle">You win</h2><div id="resultDetails" class="sub"></div><button class="big" id="rematch">Rematch</button><button class="big g" id="resultMenu">Main menu</button></div></div>
@@ -283,7 +298,8 @@ function pick(e){if(over||anim)return;mv.set(e.clientX/innerWidth*2-1,-(e.client
  const p=st.b[i];if(p&&p[0]===st.turn){sel=i;targets=legal(st,i)}else{sel=-1;targets=[]}paint()}
 // ===== modes + server-hosted multiplayer =====
 function face(){th=myColor==='b'?Math.PI:0}
-$('practice').onclick=async()=>{await leave();ai=null;myColor='both';newGame();face()};
+function setGameActive(active){$('gamePanel').classList.toggle('game-active',active)}
+$('practice').onclick=async()=>{await leave();ai=null;myColor='both';setGameActive(true);newGame();face()};
 $('flip').onclick=()=>{th+=Math.PI};
 let profile=null,onlineStream=null,matchmakingRequest=false,waitingRoomCode=null;
 function showScreen(id){['profileScreen','profileWelcome','gameMenu'].forEach(screen=>$(screen).classList.toggle('profile-hidden',screen!==id))}
@@ -308,7 +324,7 @@ function startEventStream(){if(onlineStream)return Promise.resolve();return new 
  onlineStream.addEventListener('roomCancelled',event=>{const data=JSON.parse(event.data);if(waitingRoomCode===data.code){waitingRoomCode=null;$('cancelSearch').disabled=true;$('roomInvite').textContent='';setStatus('Room closed.')}});
  onlineStream.addEventListener('open',resolve,{once:true});
  onlineStream.addEventListener('cancelled',()=>setStatus('Match search cancelled'));
- onlineStream.addEventListener('matched',event=>{const match=JSON.parse(event.data);waitingRoomCode=null;room={id:match.gameId,code:match.roomCode};ai=null;myColor=match.color;newGame();
+ onlineStream.addEventListener('matched',event=>{const match=JSON.parse(event.data);waitingRoomCode=null;room={id:match.gameId,code:match.roomCode};ai=null;myColor=match.color;setGameActive(true);newGame();
   (match.moves||[]).forEach(move=>doMove(move.from,move.to,false));anim=null;rebuild();face();$('menu').classList.add('hide');$('cancelSearch').disabled=true;
   $('roomCode').value=match.roomCode||'';$('roomInvite').textContent=match.roomCode?`Room ${match.roomCode}`:'';
   setStatus(`Playing ${match.opponent.displayName} (@${match.opponent.username}) · ${myColor==='w'?'White':'Black'}`)});
@@ -317,6 +333,7 @@ function startEventStream(){if(onlineStream)return Promise.resolve();return new 
   finishGame(result.reason==='stalemate'?'draw':result.winner,result.reason==='checkmate'?'Checkmate':result.reason==='stalemate'?'Stalemate':'Opponent resigned')});
  onlineStream.onerror=()=>{if(!onlineStream||onlineStream.readyState===EventSource.CLOSED){setStatus('Disconnected from the online server. Reload to reconnect.');reject(new Error('Could not connect to the online server'))}}})}
 async function startMatchmaking(){if(!profile){showScreen('profileScreen');return}if(matchmakingRequest||onlineStream&&(!room||!over))return;
+ setGameActive(false);
  matchmakingRequest=true;$('create').disabled=true;
  try{await leave();ai=null;myColor='both';setStatus('Connecting to online chess…');$('cancelSearch').disabled=false;await startEventStream();await postApi('/api/matchmaking',{playerId:profile.id,action:'join'})}
  catch(error){closeOnline();$('create').disabled=false;setStatus(error.message)}finally{matchmakingRequest=false}}
@@ -417,7 +434,7 @@ function playSuggestedMove(){if(!suggestedCoachMove)return;
  doMove(from,to,false)}
 async function startCoachBot(){if(!coachUnlocked)return;
  if(room||onlineStream){$('coachAdvice').textContent='Finish or leave the online game before starting a bot game.';return}
- await leave();myColor='w';ai={c:'b',lvl:3};$('menu').classList.add('hide');newGame();face();setStatus('Hard bot ready · You are White. Find a move with the coach or play your turn.') }
+ await leave();myColor='w';ai={c:'b',lvl:3};setGameActive(true);$('menu').classList.add('hide');newGame();face();setStatus('Hard bot ready · You are White. Find a move with the coach or play your turn.') }
 function setCoachUnlocked(){coachUnlocked=true;localStorage.setItem('grandmasterCoachUnlocked','true');$('coachPanel').hidden=false;$('coachAdvice').textContent='Play the hard bot or practice. Find best move to show a green arrow, or play the suggested move.'}
 $('redeemCode').onclick=()=>{if($('rewardCode').value.trim().toLowerCase()!=='balmond345'){$('coachAdvice').textContent='That reward code is not recognized.';$('coachPanel').hidden=false;return}
  setCoachUnlocked();$('rewardCode').value=''};
@@ -429,13 +446,13 @@ $('clearCoach').onclick=()=>{coachMove=null;suggestedCoachMove=null;$('playCoach
 // ===== main menu =====
 function seg(id){const el=$(id);el.onclick=e=>{const b=e.target.closest('button');if(!b)return;[...el.children].forEach(x=>x.classList.remove('on'));b.classList.add('on')};return()=>el.querySelector('.on').dataset.v}
 const getLvl=seg('lvl'),getClr=seg('clr');
-$('mAI').onclick=async()=>{await leave();let c=getClr();if(c==='r')c=Math.random()<.5?'w':'b';myColor=c;ai={c:c==='w'?'b':'w',lvl:+getLvl()};$('menu').classList.add('hide');newGame();face()};
+$('mAI').onclick=async()=>{await leave();let c=getClr();if(c==='r')c=Math.random()<.5?'w':'b';myColor=c;ai={c:c==='w'?'b':'w',lvl:+getLvl()};setGameActive(true);$('menu').classList.add('hide');newGame();face()};
 $('mLoc').onclick=()=>{$('menu').classList.add('hide');$('practice').onclick()};
 $('mOn').onclick=()=>{$('menu').classList.add('hide');setStatus('Host a room or enter your friend’s room code.');$('roomCode').focus()};
 $('rematch').onclick=async()=>{if(room){$('gameResult').hidden=true;await startMatchmaking();return}
- const color=myColor,bot=ai?{...ai}:null;$('gameResult').hidden=true;$('menu').classList.add('hide');myColor=color;ai=bot;newGame();face()};
-$('resultMenu').onclick=async()=>{await leave();ai=null;myColor='both';newGame();showScreen(profile?'gameMenu':'profileScreen');$('menu').classList.remove('hide')};
-$('menuBtn').onclick=()=>{if(profile)showScreen('gameMenu');$('menu').classList.remove('hide')};
+const color=myColor,bot=ai?{...ai}:null;$('gameResult').hidden=true;$('menu').classList.add('hide');myColor=color;ai=bot;setGameActive(true);newGame();face()};
+$('resultMenu').onclick=async()=>{await leave();ai=null;myColor='both';setGameActive(false);newGame();showScreen(profile?'gameMenu':'profileScreen');$('menu').classList.remove('hide')};
+$('menuBtn').onclick=()=>{setGameActive(false);if(profile)showScreen('gameMenu');$('menu').classList.remove('hide')};
 $('changeProfile').onclick=()=>{localStorage.removeItem('grandmasterPlayerId');localStorage.removeItem('grandmasterPlayerToken');profile=null;leave();showScreen('profileScreen')};
 newGame();scheduleTick();loadProfile();
 </script></body></html>
