@@ -192,7 +192,6 @@ function matchPlayers(firstId, secondId, roomCode = null) {
     id: crypto.randomUUID(),
     roomCode,
     players: { w: firstId, b: secondId },
-    coachConsent: { w: false, b: false },
     state: initialState(),
     moves: [],
     finished: false
@@ -205,9 +204,7 @@ function matchPlayers(firstId, secondId, roomCode = null) {
       color,
       opponent: publicProfile(profiles[other]),
       moves: [],
-      roomCode,
-      coachAllowed: game.coachConsent.w && game.coachConsent.b,
-      coachConsent: game.coachConsent
+      roomCode
     });
   }
 }
@@ -302,9 +299,7 @@ const server = http.createServer(async (request, response) => {
         const color = activeGame.players.w === playerId ? 'w' : 'b';
         const opponent = publicProfile(profiles[opponentId(activeGame, playerId)]);
         response.write(`event: matched\ndata: ${JSON.stringify({
-          gameId: activeGame.id, color, opponent, moves: activeGame.moves, roomCode: activeGame.roomCode,
-          coachAllowed: activeGame.coachConsent.w && activeGame.coachConsent.b,
-          coachConsent: activeGame.coachConsent
+          gameId: activeGame.id, color, opponent, moves: activeGame.moves, roomCode: activeGame.roomCode
         })}\n\n`);
       } else if (waitingPlayer === playerId) {
         response.write('event: searching\ndata: {}\n\n');
@@ -423,22 +418,6 @@ const server = http.createServer(async (request, response) => {
       waitingPlayer = playerId;
       send(playerId, 'searching', {});
       return json(response, 200, { status: 'searching' });
-    }
-
-    const coachMatch = url.pathname.match(/^\/api\/games\/([a-f0-9-]+)\/coach$/);
-    if (request.method === 'POST' && coachMatch) {
-      const body = await readJson(request);
-      if (!hasValidToken(body.playerId, body.token)) return json(response, 401, { error: 'Player authentication failed' });
-      const game = games.get(coachMatch[1]);
-      if (!game || game.finished) return json(response, 404, { error: 'Game is no longer active' });
-      const color = game.players.w === body.playerId ? 'w' : game.players.b === body.playerId ? 'b' : null;
-      if (!color) return json(response, 403, { error: 'You are not a player in this game' });
-      if (typeof body.enabled !== 'boolean') return json(response, 400, { error: 'Coach consent must be enabled or disabled' });
-
-      game.coachConsent[color] = body.enabled;
-      const permission = { allowed: game.coachConsent.w && game.coachConsent.b, consent: game.coachConsent };
-      for (const playerId of Object.values(game.players)) send(playerId, 'coachPermission', permission);
-      return json(response, 200, permission);
     }
 
     const moveMatch = url.pathname.match(/^\/api\/games\/([a-f0-9-]+)\/move$/);

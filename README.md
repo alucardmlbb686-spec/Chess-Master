@@ -14,4 +14,4 @@ The default profile store is `data/profiles.json`. Free Render instances use an 
 
 Active games, room codes, matchmaking queues, and event-stream connections are held in server memory. Keep the service at **one instance**: scaling to multiple instances will split this state between servers. Active games and rooms also end when the service restarts or deploys.
 
-Online coach hints are available only after both players opt in during their match. Either player can withdraw consent; suggested moves are still checked by the server as legal moves.
+Coach analysis runs locally in the player's browser. Online coach suggestions are submitted as ordinary moves and are still validated as legal by the server.
