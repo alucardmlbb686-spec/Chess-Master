@@ -47,6 +47,10 @@ button:disabled{opacity:.55;cursor:default}
  #gamePanel.game-active #cap{min-height:18px;font-size:16px}
  #gamePanel.game-active #gameActions{display:flex;gap:6px;margin:6px 0 0}
  #gamePanel.game-active #gameActions button{flex:1;min-width:0;padding:8px 6px;font-size:12px}
+ #hiddenPanelActions{left:8px;right:8px;top:calc(8px + env(safe-area-inset-top,0px))}
+ #hiddenPanelActions button{flex:1}
+ #hiddenCodePanel{left:8px;right:8px;top:calc(60px + env(safe-area-inset-top,0px));width:auto}
+ #hiddenCodePanel input{flex:1;min-width:120px}
 }
 #gamePanel.coach-view{left:auto;right:12px}
 #gamePanel.game-active .lobby-controls{display:none}
@@ -57,8 +61,12 @@ button:disabled{opacity:.55;cursor:default}
 #panelHeader .sub{margin-bottom:10px}
 #gamePanel[hidden]{display:none}
 .panel-toggle{white-space:nowrap}
-#showPanel{position:fixed;z-index:4;left:12px;top:calc(12px + env(safe-area-inset-top,0px));min-height:42px;box-shadow:0 4px 16px rgba(0,0,0,.22)}
-#showPanel[hidden]{display:none}
+#hiddenPanelActions{position:fixed;z-index:4;left:12px;top:calc(12px + env(safe-area-inset-top,0px));display:flex;gap:8px;flex-wrap:wrap}
+#hiddenPanelActions[hidden],#hiddenCodePanel[hidden]{display:none}
+#hiddenPanelActions button,#hiddenCodePanel button,#hiddenCodePanel input{min-height:42px;box-shadow:0 4px 16px rgba(0,0,0,.22)}
+#hiddenCodePanel{position:fixed;z-index:4;left:12px;top:calc(64px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:min(420px,calc(100vw - 40px));padding:10px;background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:12px}
+#hiddenCodePanel input{box-sizing:border-box;text-transform:none;letter-spacing:1px}
+#hiddenCodeMessage{flex-basis:100%;font-size:12px;color:var(--mut)}
 #menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,10,.72);backdrop-filter:blur(8px);z-index:5;padding:16px;box-sizing:border-box}
 #menu.hide{display:none}
 #gameResult{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,10,.72);backdrop-filter:blur(6px);z-index:6;padding:16px;box-sizing:border-box}
@@ -96,7 +104,8 @@ button:disabled{opacity:.55;cursor:default}
 <div id="cap"></div><div id="moves"></div>
 <div class="row" id="gameActions"><button class="g" id="menuBtn">☰ Menu</button><button class="g" id="flip">Flip</button><button class="g" id="reset">Restart</button><button class="g" id="resign">Resign</button></div>
 </div>
-<button class="g" id="showPanel" type="button" aria-controls="gamePanel" aria-expanded="false" hidden>☰ Show menu</button>
+<div id="hiddenPanelActions" hidden><button class="g" id="showPanel" type="button" aria-controls="gamePanel" aria-expanded="false">☰ Show menu</button><button class="g" id="openHiddenCode" type="button" aria-controls="hiddenCodePanel" aria-expanded="false">🎁 Coach code</button></div>
+<div id="hiddenCodePanel" hidden><input id="hiddenRewardCode" maxlength="24" placeholder="Enter coach code" aria-label="Enter coach code"><button id="redeemHiddenCode" type="button">Redeem</button><button class="g" id="closeHiddenCode" type="button" aria-label="Close coach code entry">×</button><div id="hiddenCodeMessage" role="status" aria-live="polite"></div></div>
 <svg id="coachOverlay" hidden aria-hidden="true"><defs><marker id="coachArrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#22ff66" stroke="#fff" stroke-width="0.6"/></marker></defs><line id="coachLine"/><circle id="coachStart" r="8"/><circle id="coachEnd" r="10"/><circle id="coachTargetLabel" r="17"/><text id="coachTargetText" text-anchor="middle" dominant-baseline="central"></text></svg>
 <div id="gameResult" hidden role="dialog" aria-modal="true" aria-labelledby="resultTitle"><div class="card"><h2 id="resultTitle">You win</h2><div id="resultDetails" class="sub"></div><button class="big" id="rematch">Rematch</button><button class="big g" id="resultMenu">Main menu</button></div></div>
 <div id="menu"><div class="card">
@@ -418,8 +427,9 @@ function maybeAI(){if(!ai||over||thinking||!st||st.turn!==ai.c)return;thinking=t
   catch(error){console.error('Computer move failed:',error);if(g===gid)setStatus('Computer could not calculate a move. Please restart the game.')}
   finally{if(g===gid)thinking=false}},anim?650:350)}
 let coachUnlocked=localStorage.getItem('grandmasterCoachUnlocked')==='true';
-function setPanelHidden(hidden){$('gamePanel').hidden=hidden;$('showPanel').hidden=!hidden;
- $('hidePanel').setAttribute('aria-expanded',String(!hidden));$('showPanel').setAttribute('aria-expanded',String(!hidden))}
+function setPanelHidden(hidden){$('gamePanel').hidden=hidden;$('hiddenPanelActions').hidden=!hidden;
+ $('hidePanel').setAttribute('aria-expanded',String(!hidden));$('showPanel').setAttribute('aria-expanded',String(!hidden));
+ if(!hidden){$('hiddenCodePanel').hidden=true;$('openHiddenCode').setAttribute('aria-expanded','false')}}
 function coachTextForMove(from,to,line,depth){const piece=st.b[from],captured=st.b[to],next=apply(st,from,to),givesCheck=inCheck(next,next.turn);
  let explanation=inCheck(st,st.turn)?'You are in check; this move gets your king out of danger.':captured?`This captures the ${pieceNames[captured[1]]} on ${sqn(to)} and improves your material.`:givesCheck?'This move gives check and forces the opponent to answer the king threat.':'This is the strongest engine candidate: improve your piece activity and watch the opponent’s forcing replies.';
  const reply=line.length>=4?`Likely reply: ${sqn(line[2])} to ${sqn(line[3])}. Before moving, check whether that reply attacks your queen or leaves your king exposed.`:'The search found no forced reply at this depth.';
@@ -446,12 +456,24 @@ async function startCoachBot(){if(!coachUnlocked)return;
  if(room||onlineStream){$('coachAdvice').textContent='Finish or leave the online game before starting a bot game.';return}
  await leave();myColor='w';ai={c:'b',lvl:3};setGameActive(true);$('menu').classList.add('hide');newGame();face();setStatus('Hard bot ready · You are White. Find a move with the coach or play your turn.') }
 function setCoachUnlocked(){coachUnlocked=true;localStorage.setItem('grandmasterCoachUnlocked','true');$('coachPanel').hidden=false;$('coachAdvice').textContent='Play the hard bot or practice. Find best move to show a green arrow, or play the suggested move.'}
-$('redeemCode').onclick=()=>{if($('rewardCode').value.trim().toLowerCase()!=='balmond345'){$('coachAdvice').textContent='That reward code is not recognized.';$('coachPanel').hidden=false;return}
- setCoachUnlocked();$('rewardCode').value=''};
+function redeemCoachCode(input,fromHiddenPanel=false){if(input.value.trim().toLowerCase()!=='balmond345'){
+ const message='That reward code is not recognized.';
+ if(fromHiddenPanel)$('hiddenCodeMessage').textContent=message;
+ else{$('coachAdvice').textContent=message;$('coachPanel').hidden=false}
+ return}
+ setCoachUnlocked();input.value='';$('hiddenCodeMessage').textContent='';
+ if(fromHiddenPanel)setPanelHidden(false)}
+$('redeemCode').onclick=()=>redeemCoachCode($('rewardCode'));
+$('redeemHiddenCode').onclick=()=>redeemCoachCode($('hiddenRewardCode'),true);
 $('rewardCode').addEventListener('keydown',event=>{if(event.key==='Enter'){$('redeemCode').click()}});
+$('hiddenRewardCode').addEventListener('keydown',event=>{if(event.key==='Enter'){$('redeemHiddenCode').click()}});
 $('coachHint').onclick=requestCoachHint;
 $('hidePanel').onclick=()=>setPanelHidden(true);
 $('showPanel').onclick=()=>setPanelHidden(false);
+$('openHiddenCode').onclick=()=>{$('hiddenCodePanel').hidden=!$('hiddenCodePanel').hidden;
+ $('openHiddenCode').setAttribute('aria-expanded',String(!$('hiddenCodePanel').hidden));
+ if(!$('hiddenCodePanel').hidden)$('hiddenRewardCode').focus()};
+$('closeHiddenCode').onclick=()=>{$('hiddenCodePanel').hidden=true;$('openHiddenCode').setAttribute('aria-expanded','false')};
 $('playCoachMove').onclick=playSuggestedMove;
 $('playCoachBot').onclick=startCoachBot;
 $('clearCoach').onclick=()=>{coachMove=null;suggestedCoachMove=null;$('playCoachMove').disabled=true;clearCoachArrow();paint();$('coachAdvice').textContent='Hint cleared. Request another move whenever you need one.'};
