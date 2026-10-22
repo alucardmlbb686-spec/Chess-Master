@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grandmaster Chess 3D</title>
+<style>
+:root{--bg:#0b0d12;--panel:rgba(18,20,27,.82);--text:#eceff4;--mut:#9aa3b2;--acc:#d6a85a;--line:rgba(255,255,255,.1);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#d9dbe0;--panel:rgba(255,255,255,.86);--text:#15181f;--mut:#566072;--line:rgba(0,0,0,.12)}}
+:root[data-theme="light"]{--bg:#d9dbe0;--panel:rgba(255,255,255,.86);--text:#15181f;--mut:#566072;--line:rgba(0,0,0,.12)}
+:root[data-theme="dark"]{--bg:#0b0d12}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%;touch-action:none}
+.panel{position:fixed;z-index:2;left:12px;top:calc(12px + env(safe-area-inset-top,0px));width:280px;max-width:calc(100% - 24px);background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;padding:14px;max-height:calc(100% - 100px);overflow:auto}
+h1{font:600 17px Georgia,serif;margin:0 0 2px;letter-spacing:.5px;color:var(--acc)}
+.sub{color:var(--mut);font-size:12px;margin-bottom:10px}
+.row{display:flex;gap:6px;margin:6px 0}
+input{flex:1;min-width:0;background:transparent;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;text-transform:uppercase;letter-spacing:2px}
+#rewardCode{text-transform:none;letter-spacing:1px}
+button{background:var(--acc);color:#1a1405;border:0;border-radius:8px;padding:8px 10px;font:600 13px inherit;cursor:pointer}
+button.g{background:transparent;color:var(--text);border:1px solid var(--line)}
+button:disabled{opacity:.55;cursor:default}
+#status{margin:8px 0;padding:8px;border-radius:8px;background:rgba(214,168,90,.14);font-weight:600}
+#coachPanel{border:1px solid rgba(74,222,128,.35);border-radius:9px;padding:9px;margin:8px 0;color:var(--text)}
+#coachPanel[hidden]{display:none}
+#coachPanel p{font-size:12px;color:var(--mut);margin:6px 0}
+#coachAdvice{font-size:12px;line-height:1.5;white-space:pre-line}
+#coachPanel .row{flex-wrap:wrap}
+#coachPanel .row button{flex:1}
+#coachOverlay{position:fixed;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible}
+#coachOverlay[hidden]{display:none}
+#coachLine{stroke:#22ff66;stroke-width:8;stroke-linecap:round;filter:drop-shadow(0 0 5px #07190b) drop-shadow(0 0 9px #22ff66);marker-end:url(#coachArrowhead)}
+#coachStart,#coachEnd{fill:#22ff66;stroke:#fff;stroke-width:2;filter:drop-shadow(0 0 5px #22ff66)}
+#coachTargetLabel{fill:#102719;stroke:#22ff66;stroke-width:2}
+#coachTargetText{fill:white;font:700 15px system-ui,sans-serif;paint-order:stroke;stroke:#102719;stroke-width:3px}
+#cap{font-size:18px;min-height:22px;letter-spacing:1px}
+#moves{font:12px ui-monospace,monospace;color:var(--mut);max-height:120px;overflow:auto;display:grid;grid-template-columns:28px 1fr 1fr;gap:2px 6px}
+#hud{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));font-size:11px;color:var(--mut);text-align:right;max-width:60%}
+@media(max-width:640px){.panel{width:auto;right:12px;max-height:42%}}
+#gamePanel.coach-view{left:auto;right:12px}
+@media(max-width:640px){#gamePanel.coach-view{left:12px;right:12px;top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));max-height:34%}}
+#menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,10,.72);backdrop-filter:blur(8px);z-index:5;padding:16px;box-sizing:border-box}
+#menu.hide{display:none}
+#gameResult{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,10,.72);backdrop-filter:blur(6px);z-index:6;padding:16px;box-sizing:border-box}
+#gameResult[hidden]{display:none}
+#gameResult .card{width:360px}
+#resultTitle{font-size:32px}
+#resultDetails{text-align:center}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;width:420px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.card h2{font:600 26px Georgia,serif;color:var(--acc);margin:0 0 4px;text-align:center}
+.card .sub{text-align:center;margin-bottom:16px}
+.lbl{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--mut);margin:12px 0 4px}
+.seg{display:flex;gap:6px}.seg button{flex:1}
+.seg button.on{background:var(--acc);color:#1a1405}
+.seg button:not(.on){background:transparent;color:var(--text);border:1px solid var(--line)}
+.big{width:100%;padding:12px;margin-top:8px;font-size:14px}
+.profile-form{display:grid;gap:8px}
+.profile-form label{font-size:12px;color:var(--mut)}
+.profile-form input{width:100%;box-sizing:border-box;text-transform:none;letter-spacing:normal}
+.profile-note{color:var(--mut);font-size:12px;margin:8px 0}
+.profile-error{color:#ff9c8f;min-height:18px;font-size:12px}
+.profile-id{overflow-wrap:anywhere;color:var(--acc);font:12px ui-monospace,monospace}
+.profile-chip{font-size:11px;color:var(--mut);margin-left:auto}
+.profile-hidden{display:none}
+</style></head><body>
+<div class="panel" id="gamePanel">
+<h1>♞ Grandmaster Chess 3D</h1><div class="sub">Real-time multiplayer · physically based rendering</div>
+<div class="row"><button id="hostRoom">Host room</button><button class="g" id="create">Quick match</button></div>
+<div class="row"><input id="roomCode" maxlength="6" placeholder="ROOM CODE" aria-label="Room code"><button class="g" id="joinRoom">Join room</button></div>
+<div class="row"><button class="g" id="cancelSearch" disabled>Cancel search</button><span id="roomInvite" class="profile-chip"></span></div>
+<div class="row"><button class="g" id="practice">Practice</button><span id="profileSummary" class="profile-chip"></span></div>
+<div class="row"><input id="rewardCode" maxlength="24" placeholder="Reward code" aria-label="Reward code"><button class="g" id="redeemCode">Redeem</button></div>
+<div id="coachPanel" hidden><strong>Grandmaster coach unlocked</strong><p>Single-player hints only · Hard engine · depth 4</p><div class="row"><button id="coachHint">Find best move</button><button class="g" id="playCoachMove" disabled>Play suggested move</button></div>
+<div class="row"><button class="g" id="playCoachBot">Play the hard bot</button><button class="g" id="clearCoach">Clear arrow</button></div><div id="coachAdvice" role="status" aria-live="polite"></div></div>
+<div id="status">Choose a mode to begin</div>
+<div id="cap"></div><div id="moves"></div>
+<div class="row"><button class="g" id="menuBtn">☰ Menu</button><button class="g" id="flip">Flip</button><button class="g" id="reset">Restart</button><button class="g" id="resign">Resign</button></div>
+</div>
+<svg id="coachOverlay" hidden aria-hidden="true"><defs><marker id="coachArrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#22ff66" stroke="#fff" stroke-width="0.6"/></marker></defs><line id="coachLine"/><circle id="coachStart" r="8"/><circle id="coachEnd" r="10"/><circle id="coachTargetLabel" r="17"/><text id="coachTargetText" text-anchor="middle" dominant-baseline="central"></text></svg>
+<div id="gameResult" hidden role="dialog" aria-modal="true" aria-labelledby="resultTitle"><div class="card"><h2 id="resultTitle">You win</h2><div id="resultDetails" class="sub"></div><button class="big" id="rematch">Rematch</button><button class="big g" id="resultMenu">Main menu</button></div></div>
+<div id="menu"><div class="card">
+<section id="profileScreen"><h2>Create your player profile</h2><div class="sub">Set up your identity before your first game</div>
+<form id="profileForm" class="profile-form">
+<label for="displayName">Display name</label><input id="displayName" name="displayName" maxlength="40" required minlength="2" autocomplete="name" placeholder="How other players see you">
+<label for="username">Username</label><input id="username" name="username" maxlength="16" required minlength="3" pattern="[A-Za-z0-9_]{3,16}" autocomplete="username" placeholder="3–16 letters, numbers, or underscores">
+<div id="profileError" class="profile-error" role="alert"></div>
+<button class="big" id="createProfile" type="submit">Create player profile</button>
+</form><div class="profile-note">Your username is public and unique. A private player ID will be assigned to your profile.</div>
+</section>
+<section id="profileWelcome" class="profile-hidden"><h2 id="welcomeName"></h2><div class="sub">Your player profile is ready</div><div class="lbl">Unique player ID</div><div id="playerId" class="profile-id"></div><button class="big" id="continueProfile">Continue to chess</button></section>
+<section id="gameMenu" class="profile-hidden"><h2>♞ Grandmaster Chess</h2><div class="sub">Create your profile, host a private room, and share its code with a friend</div>
+<div class="lbl">Play the computer</div>
+<div class="seg" id="lvl"><button data-v="1">Easy</button><button data-v="2" class="on">Medium</button><button data-v="3">Hard</button></div>
+<div class="lbl">Your color</div>
+<div class="seg" id="clr"><button data-v="w" class="on">White</button><button data-v="b">Black</button><button data-v="r">Random</button></div>
+<button class="big" id="mAI">Start vs Computer</button>
+<div class="lbl">Or play people</div>
+<button class="big g" id="mOn">Online multiplayer</button>
+<button class="big g" id="mLoc">Local 2-player</button><div class="profile-note">Profile: <span id="menuProfile"></span> · <button class="g" id="changeProfile" type="button">Change</button></div>
+</section></div></div>
+<div id="hud">Drag to orbit · scroll to zoom · tap to move</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ===== Chess engine =====
+const $=id=>document.getElementById(id);
+function initState(){const b=Array(64).fill(null),k='RNBQKBNR';for(let c=0;c<8;c++){b[c]='b'+k[c];b[8+c]='bP';b[48+c]='wP';b[56+c]='w'+k[c]}return{b,turn:'w',cas:{wK:1,wQ:1,bK:1,bQ:1},ep:-1}}
+const N=[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]],KG=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+function pseudo(st,i,castle){const b=st.b,p=b[i],col=p[0],t=p[1],r=i>>3,c=i&7,out=[];
+ const add=(r2,c2)=>{if(r2<0||r2>7||c2<0||c2>7)return false;const q=b[r2*8+c2];if(!q){out.push(r2*8+c2);return true}if(q[0]!==col)out.push(r2*8+c2);return false};
+ if(t==='P'){const d=col==='w'?-1:1,s=col==='w'?6:1;if(!b[(r+d)*8+c]){out.push((r+d)*8+c);if(r===s&&!b[(r+2*d)*8+c])out.push((r+2*d)*8+c)}
+  for(const dc of[-1,1]){const c2=c+dc,r2=r+d;if(c2<0||c2>7)continue;const q=b[r2*8+c2];if((q&&q[0]!==col)||r2*8+c2===st.ep)out.push(r2*8+c2)}}
+ else if(t==='N')N.forEach(([a,d])=>add(r+a,c+d));
+ else if(t==='K'){KG.forEach(([a,d])=>add(r+a,c+d));
+  if(castle&&r===(col==='w'?7:0)&&c===4){const o=col==='w'?'b':'w',B=r*8;
+   if(st.cas[col+'K']&&!b[B+5]&&!b[B+6]&&!att(st,B+4,o)&&!att(st,B+5,o)&&!att(st,B+6,o))out.push(B+6);
+   if(st.cas[col+'Q']&&!b[B+1]&&!b[B+2]&&!b[B+3]&&!att(st,B+4,o)&&!att(st,B+3,o)&&!att(st,B+2,o))out.push(B+2)}}
+ else{const dirs=t==='R'?KG.slice(0,4):t==='B'?KG.slice(4):KG;for(const[a,d]of dirs){let rr=r+a,cc=c+d;while(add(rr,cc)){rr+=a;cc+=d}}}
+ return out}
+function att(st,sq,by){const b=st.b,sr=sq>>3,sc=sq&7;for(let i=0;i<64;i++){const p=b[i];if(!p||p[0]!==by)continue;
+ if(p[1]==='P'){const d=by==='w'?-1:1;if((i>>3)+d===sr&&Math.abs((i&7)-sc)===1)return true}else if(pseudo(st,i,false).includes(sq))return true}return false}
+function apply(st,f,t,promo){const n={b:st.b.slice(),turn:st.turn==='w'?'b':'w',cas:{...st.cas},ep:-1},p=n.b[f],col=p[0];
+ if(p[1]==='P'&&t===st.ep&&!st.b[t])n.b[(f>>3)*8+(t&7)]=null;
+ if(p[1]==='K'&&Math.abs((t&7)-(f&7))===2){const B=(f>>3)*8;if(t&4){}if((t&7)===6){n.b[B+5]=n.b[B+7];n.b[B+7]=null}else{n.b[B+3]=n.b[B];n.b[B]=null}}
+ if(p[1]==='P'&&Math.abs(t-f)===16)n.ep=(f+t)/2;
+ n.b[t]=p;n.b[f]=null;if(p[1]==='P'&&(t>>3===0||t>>3===7))n.b[t]=col+(promo||'Q');
+ if(p[1]==='K'){n.cas[col+'K']=0;n.cas[col+'Q']=0}
+ for(const s of[f,t]){if(s===63)n.cas.wK=0;if(s===56)n.cas.wQ=0;if(s===7)n.cas.bK=0;if(s===0)n.cas.bQ=0}return n}
+function inCheck(st,col){const k=st.b.indexOf(col+'K');return k>=0&&att(st,k,col==='w'?'b':'w')}
+function legal(st,i){const p=st.b[i];if(!p||p[0]!==st.turn)return[];const king=p[0]==='w'?'bK':'wK';return pseudo(st,i,true).filter(t=>st.b[t]!==king&&!inCheck(apply(st,i,t),p[0]))}
+function anyMove(st){for(let i=0;i<64;i++)if(legal(st,i).length)return true;return false}
+const sqn=i=>'abcdefgh'[i&7]+(8-(i>>3));
+// ===== 3D scene =====
+const R=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+R.setPixelRatio(Math.min(devicePixelRatio,1));R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+R.shadowMap.autoUpdate=false;
+R.outputEncoding=THREE.sRGBEncoding;R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=.72;document.body.appendChild(R.domElement);
+const S=new THREE.Scene();S.background=new THREE.Color(0x0a0c11);S.fog=new THREE.Fog(0x0a0c11,22,50);
+const cam=new THREE.PerspectiveCamera(40,1,.1,100);
+// studio environment for reflections
+{const es=new THREE.Scene();es.add(new THREE.Mesh(new THREE.BoxGeometry(40,20,40),new THREE.MeshBasicMaterial({color:0x1c2230,side:THREE.BackSide})));
+ [[0,9,0,14,.2,14,1.1],[-14,5,0,.2,6,12,.55],[14,5,4,.2,6,10,.45],[0,4,-14,16,5,.2,.5]].forEach(a=>{const m=new THREE.Mesh(new THREE.BoxGeometry(a[3],a[4],a[5]),new THREE.MeshBasicMaterial({color:new THREE.Color(1,.93,.82).multiplyScalar(a[6])}));m.position.set(a[0],a[1],a[2]);es.add(m)});
+ const pm=new THREE.PMREMGenerator(R);S.environment=pm.fromScene(es,.04).texture}
+S.add(new THREE.HemisphereLight(0xdfe8ff,0x6a5440,.3));
+const fill=new THREE.DirectionalLight(0xfff4e6,.3);fill.position.set(5,8,10);S.add(fill);
+const sun=new THREE.DirectionalLight(0xfff0dc,1.25);sun.position.set(-6,12,7);sun.castShadow=true;sun.shadow.mapSize.set(512,512);
+Object.assign(sun.shadow.camera,{left:-8,right:8,top:8,bottom:-8,near:1,far:30});sun.shadow.bias=-.0006;sun.shadow.normalBias=.04;sun.shadow.radius=2;S.add(sun);
+function wood(c1,c2,seed){const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d');g.fillStyle=c1;g.fillRect(0,0,512,512);let s=seed;const rnd=()=>(s=(s*16807)%2147483647)/2147483647;
+ for(let i=0;i<260;i++){g.strokeStyle=c2;g.globalAlpha=.04+rnd()*.12;g.lineWidth=.5+rnd()*3;const y=rnd()*512;g.beginPath();g.moveTo(0,y);for(let x=0;x<=512;x+=64)g.lineTo(x,y+Math.sin(x*.02+i)*4+rnd()*3);g.stroke()}
+ const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=8;return t}
+const mat=(o)=>new THREE.MeshPhysicalMaterial(o);
+const mLight=mat({map:wood('#e3c28f','#a8773f',7),roughness:.62,clearcoat:.22,clearcoatRoughness:.38});
+const mDark=mat({map:wood('#5a3420','#2a140a',11),roughness:.62,clearcoat:.22,clearcoatRoughness:.38});
+const mFrame=mat({map:wood('#2b1a10','#120805',3),roughness:.68,clearcoat:.18});
+const mW=mat({color:0xe6dcc6,roughness:.62,clearcoat:.18,clearcoatRoughness:.4,envMapIntensity:.35}),mB=mat({color:0x0e0b09,roughness:.65,metalness:0,clearcoat:.18,clearcoatRoughness:.4,envMapIntensity:.25});
+const board=new THREE.Group();S.add(board);
+const table=new THREE.Mesh(new THREE.CylinderGeometry(15,15,.5,96),mat({color:0x1a1d24,roughness:.8,metalness:.02,clearcoat:.08}));table.position.y=-.75;table.receiveShadow=true;S.add(table);
+const slab=new THREE.Mesh(new THREE.BoxGeometry(9.4,.3,9.4),mFrame);slab.position.y=-.35;slab.castShadow=slab.receiveShadow=true;S.add(slab);
+[[9.4,.3,.7,0,4.35],[9.4,.3,.7,0,-4.35],[.7,.3,8,4.35,0],[.7,.3,8,-4.35,0]].forEach(a=>{const m=new THREE.Mesh(new THREE.BoxGeometry(a[0],a[1],a[2]),mFrame);m.position.set(a[3],-.09,a[4]);m.castShadow=m.receiveShadow=true;S.add(m)});
+const sqMesh=[],squaresByColor=[[],[]],squareGeometry=new THREE.BoxGeometry(1,.2,1),squareTransform=new THREE.Object3D();
+for(let i=0;i<64;i++)squaresByColor[((i>>3)+(i&7))%2].push(i);
+for(let color=0;color<2;color++){const squares=squaresByColor[color],instances=new THREE.InstancedMesh(squareGeometry,color?mDark:mLight,squares.length);
+ instances.userData.squares=squares;instances.receiveShadow=true;
+ squares.forEach((square,index)=>{squareTransform.position.set((square&7)-3.5,-.1,(square>>3)-3.5);squareTransform.updateMatrix();instances.setMatrixAt(index,squareTransform.matrix)});
+ instances.instanceMatrix.needsUpdate=true;S.add(instances);sqMesh.push(instances)}
+const V=a=>a.map(p=>new THREE.Vector2(p[0],p[1])),BASE=[[0,0],[.4,0],[.42,.05],[.4,.1],[.33,.14],[.3,.18]];
+const PROF={P:[...BASE,[.2,.25],[.15,.38],[.2,.45],[.22,.5],[.14,.52],[.1,.55]],R:[...BASE,[.24,.28],[.22,.55],[.3,.62],[.3,.75],[0,.75]],B:[...BASE,[.2,.3],[.13,.55],[.2,.65],[.17,.8],[.1,.95],[0,.98]],Q:[...BASE,[.22,.3],[.14,.7],[.26,1],[.2,1.1],[0,1.1]],K:[...BASE,[.24,.3],[.16,.75],[.27,1],[.2,1.1],[0,1.1]],N:[...BASE,[.3,.2],[0,.2]]};
+const GEO={};for(const k in PROF)GEO[k]=new THREE.LatheGeometry(V(PROF[k]),32);
+const sphereGeometries=new Map(),boxGeometries=new Map();
+const sph=r=>{if(!sphereGeometries.has(r))sphereGeometries.set(r,new THREE.SphereGeometry(r,12,8));return sphereGeometries.get(r)};
+const bx=(a,b,c)=>{const key=`${a},${b},${c}`;if(!boxGeometries.has(key))boxGeometries.set(key,new THREE.BoxGeometry(a,b,c));return boxGeometries.get(key)};
+const kShape=new THREE.Shape();
+kShape.moveTo(-.28,.04);kShape.lineTo(.2,.04);kShape.quadraticCurveTo(.18,.2,.1,.31);
+kShape.quadraticCurveTo(.08,.4,.2,.48);kShape.quadraticCurveTo(.3,.49,.38,.57);
+kShape.quadraticCurveTo(.4,.61,.34,.66);kShape.lineTo(.24,.65);
+kShape.quadraticCurveTo(.3,.75,.28,.82);kShape.quadraticCurveTo(.26,.9,.18,.84);
+kShape.lineTo(.1,.78);kShape.lineTo(.01,.97);kShape.lineTo(-.08,.9);
+kShape.quadraticCurveTo(-.1,.81,-.13,.72);kShape.quadraticCurveTo(-.23,.61,-.29,.44);
+kShape.quadraticCurveTo(-.36,.23,-.28,.04);kShape.closePath();
+const kGeo=new THREE.ExtrudeGeometry(kShape,{depth:.2,bevelEnabled:true,bevelSize:.035,bevelThickness:.035,bevelSegments:2,curveSegments:8});kGeo.translate(0,0,-.1);
+const eyeMat=new THREE.MeshStandardMaterial({color:0x211710,roughness:.55});
+const eyeShineMat=new THREE.MeshBasicMaterial({color:0xfff2d3});
+const muzzleWhiteMat=new THREE.MeshStandardMaterial({color:0xb09b7b,roughness:.78});
+const detailMat=new THREE.MeshStandardMaterial({color:0xc59b59,metalness:.28,roughness:.48});
+function buildPiece(code){const col=code[0],t=code[1],m=col==='w'?mW:mB,g=new THREE.Group();const add=(geo,x,y,z,material=m,castsShadow=false)=>{const o=new THREE.Mesh(geo,material);o.position.set(x||0,y||0,z||0);o.castShadow=castsShadow;g.add(o);return o};
+ add(GEO[t],0,0,0,m,true);
+ if(t==='P')add(sph(.17),0,.65,0);
+ if(t==='R')for(let i=0;i<6;i++){const a=i*Math.PI/3,o=add(bx(.14,.12,.12),Math.cos(a)*.22,.8,Math.sin(a)*.22);o.rotation.y=-a}
+ if(t==='B')add(sph(.06),0,1.04,0);
+ if(t==='Q'){add(sph(.08),0,1.2,0);for(let i=0;i<8;i++){const a=i*Math.PI/4;add(sph(.055),Math.cos(a)*.21,1.1,Math.sin(a)*.21)}}
+ if(t==='K'){add(bx(.08,.32,.08),0,1.28,0);add(bx(.24,.08,.08),0,1.33,0)}
+ if(t==='N'){const h=new THREE.Group();h.position.y=.18;h.rotation.y=col==='w'?0:Math.PI;g.add(h);
+  const head=new THREE.Mesh(kGeo,m);head.castShadow=true;h.add(head);
+  const faceMat=col==='w'?eyeMat:detailMat,muzzleMat=col==='w'?muzzleWhiteMat:m;
+  const ear=new THREE.Mesh(new THREE.ConeGeometry(.065,.22,6),m);ear.position.set(.08,.91,0);ear.rotation.z=-.18;ear.castShadow=true;h.add(ear);
+  const muzzle=new THREE.Mesh(sph(.095),muzzleMat);muzzle.position.set(.31,.51,0);muzzle.scale.set(1,.65,.78);h.add(muzzle);
+  for(const z of[-.135,.135]){
+   const socket=new THREE.Mesh(sph(.057),col==='w'?muzzleWhiteMat:m);socket.position.set(.15,.68,z*.72);socket.scale.set(1,.86,.46);h.add(socket);
+   const eye=new THREE.Mesh(sph(.036),faceMat);eye.position.set(.17,.69,z);eye.scale.set(1,.9,.48);h.add(eye);
+   if(col==='w'){const shine=new THREE.Mesh(sph(.012),eyeShineMat);shine.position.set(.18,.705,z*1.18);h.add(shine)}
+   const nostril=new THREE.Mesh(sph(.021),eyeMat);nostril.position.set(.375,.54,z*.48);nostril.scale.set(.6,.72,.55);h.add(nostril);
+   const cheek=new THREE.Mesh(sph(.075),m);cheek.position.set(.03,.43,z*.82);cheek.scale.set(1,.62,.4);h.add(cheek)}
+  const bridle=new THREE.Mesh(new THREE.TorusGeometry(.074,.012,5,16),detailMat);bridle.position.set(.34,.5,0);bridle.rotation.y=Math.PI/2;h.add(bridle)}
+ return g}
+// ===== game state =====
+let st,hist=[],myColor='both',sel=-1,targets=[],last=null,over=false,room=null,pieces=new THREE.Group(),hl=new THREE.Group(),coachArrows=new THREE.Group(),coachMove=null,suggestedCoachMove=null,anim=null;
+S.add(pieces,hl,coachArrows);
+const pieceTemplates={},pieceBatches=new Map(),pieceTransform=new THREE.Matrix4(),piecePosition=new THREE.Vector3();
+for(const color of['w','b'])for(const type of'PNBRQK'){
+ const code=color+type,template=buildPiece(code),parts=[];template.updateMatrixWorld(true);
+ template.traverse(object=>{if(!object.isMesh)return;const key=`${object.geometry.uuid}:${object.material.uuid}`;
+  let batch=pieceBatches.get(key);if(!batch){batch=new THREE.InstancedMesh(object.geometry,object.material,64);batch.count=0;batch.castShadow=object.castShadow;batch.receiveShadow=false;batch.frustumCulled=false;batch.userData.squares=[];pieceBatches.set(key,batch)}
+  parts.push({batch,local:object.matrixWorld.clone()})});
+ pieceTemplates[code]=parts}
+function rebuild(skip){while(pieces.children.length)pieces.remove(pieces.children[0]);
+ for(const batch of pieceBatches.values()){batch.count=0;batch.userData.squares.length=0}
+ if(anim)anim.instances=[];
+ for(let square=0;square<64;square++){const code=st.b[square];if(!code)continue;
+  const origin=square===skip&&anim?anim.from:square;piecePosition.set((origin&7)-3.5,0,(origin>>3)-3.5);
+  for(const part of pieceTemplates[code]){const index=part.batch.count++;part.batch.userData.squares[index]=square;
+   pieceTransform.makeTranslation(piecePosition.x,piecePosition.y,piecePosition.z).multiply(part.local);part.batch.setMatrixAt(index,pieceTransform);
+   if(square===skip&&anim)anim.instances.push({batch:part.batch,index,local:part.local})}}
+ for(const batch of pieceBatches.values()){batch.instanceMatrix.needsUpdate=true;pieces.add(batch)}
+ R.shadowMap.needsUpdate=true}
+const highlightMaterials=new Map(),highlightGeometry={square:new THREE.PlaneGeometry(.98,.98)},highlightCircles=new Map();
+function highlightMaterial(color,opacity){const key=`${color}:${opacity}`;if(!highlightMaterials.has(key))highlightMaterials.set(key,new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false}));return highlightMaterials.get(key)}
+function clearHighlights(){while(hl.children.length)hl.remove(hl.children[0])}
+function paint(){clearHighlights();const pl=(i,c,o,r)=>{let geometry=highlightGeometry.square;if(r){if(!highlightCircles.has(r))highlightCircles.set(r,new THREE.CircleGeometry(r,20));geometry=highlightCircles.get(r)}
+ const m=new THREE.Mesh(geometry,highlightMaterial(c,o));m.rotation.x=-Math.PI/2;m.position.set((i&7)-3.5,.012,(i>>3)-3.5);hl.add(m)};
+ if(last){pl(last[0],0xe8c35a,.35);pl(last[1],0xe8c35a,.45)}
+ if(!over&&inCheck(st,st.turn))pl(st.b.indexOf(st.turn+'K'),0xff2a2a,.6);
+ if(coachMove){pl(coachMove.from,0x22ff66,.35);pl(coachMove.to,0x22ff66,.55)}
+ if(sel>=0){pl(sel,0x4ade80,.5);targets.forEach(t=>pl(t,0x4ade80,.7,st.b[t]?.46:.17))}}
+function clearCoachArrow(){$('gamePanel').classList.remove('coach-view');$('coachOverlay').hidden=true;for(const child of [...coachArrows.children]){coachArrows.remove(child);child.traverse?.(object=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach(material=>material.dispose());else object.material?.dispose()})}}
+function setCoachMove(from,to){clearCoachArrow();coachMove={from,to};suggestedCoachMove={from,to};$('coachOverlay').hidden=false;$('playCoachMove').disabled=false;
+ const start=new THREE.Vector3((from&7)-3.5,1.8,(from>>3)-3.5),end=new THREE.Vector3((to&7)-3.5,1.8,(to>>3)-3.5),delta=end.clone().sub(start),length=delta.length();
+ coachArrows.add(new THREE.ArrowHelper(delta.normalize(),start,length,0x22ff66,.4,.24));$('gamePanel').classList.add('coach-view');paint()}
+function updateCoachOverlay(){if(!coachMove)return;const point=square=>new THREE.Vector3((square&7)-3.5,1.8,(square>>3)-3.5).project(cam);
+ const from=point(coachMove.from),to=point(coachMove.to),visible=[from,to].every(p=>p.z>=-1&&p.z<=1);
+ $('coachOverlay').hidden=!visible;if(!visible)return;
+ const screen=p=>({x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2}),a=screen(from),b=screen(to);
+ $('coachLine').setAttribute('x1',a.x);$('coachLine').setAttribute('y1',a.y);$('coachLine').setAttribute('x2',b.x);$('coachLine').setAttribute('y2',b.y);
+ $('coachStart').setAttribute('cx',a.x);$('coachStart').setAttribute('cy',a.y);
+ $('coachEnd').setAttribute('cx',b.x);$('coachEnd').setAttribute('cy',b.y);
+ const label={x:b.x+20,y:b.y-22};$('coachTargetLabel').setAttribute('cx',label.x);$('coachTargetLabel').setAttribute('cy',label.y);
+ $('coachTargetText').setAttribute('x',label.x);$('coachTargetText').setAttribute('y',label.y);$('coachTargetText').textContent=sqn(coachMove.to)}
+const GL={wP:'♙',wN:'♘',wB:'♗',wR:'♖',wQ:'♕',wK:'♔',bP:'♟',bN:'♞',bB:'♝',bR:'♜',bQ:'♛',bK:'♚'};
+function ui(){const cnt={};st.b.forEach(p=>p&&(cnt[p]=(cnt[p]||0)+1));const full={P:8,N:2,B:2,R:2,Q:1,K:1};let cap='';
+ for(const c of['b','w'])for(const t of'QRBNP'){const n=(full[t]||0)-(cnt[c+t]||0);for(let i=0;i<Math.max(0,n);i++)cap+=GL[c+t]}
+ $('cap').textContent=cap;let h='';hist.forEach((m,i)=>{h+=(i%2?'':`<span>${i/2+1}.</span>`)+`<span>${m}</span>`});$('moves').innerHTML=h;$('moves').scrollTop=1e5;
+ if(!over){const mine=myColor==='both'||myColor===st.turn;setStatus((st.turn==='w'?'White':'Black')+' to move'+(inCheck(st,st.turn)?' — check!':'')+(myColor!=='both'?(mine?' (your turn)':' (waiting)'):''))}}
+function setStatus(t){$('status').textContent=t}
+function finishGame(winner,reason){over=true;
+ const title=winner==='draw'?'Draw':myColor==='both'?(winner==='w'?'White wins':'Black wins'):(winner===myColor?'You win':'You lost');
+ $('resultTitle').textContent=title;$('resultDetails').textContent=reason;$('gameResult').hidden=false;setStatus(title)}
+function newGame(){st=initState();hist=[];last=null;sel=-1;targets=[];over=false;anim=null;coachMove=null;suggestedCoachMove=null;$('playCoachMove').disabled=true;$('gameResult').hidden=true;clearCoachArrow();rebuild();paint();ui()}
+function doMove(f,t,send){if(send&&room){submitMove(f,t);return}const p=st.b[f],cap=st.b[t]||(p[1]==='P'&&t===st.ep);st=apply(st,f,t);
+ let n=(p[1]==='K'&&Math.abs((t&7)-(f&7))===2)?((t&7)===6?'O-O':'O-O-O'):(p[1]==='P'?'':p[1])+(cap?(p[1]==='P'?'abcdefgh'[f&7]:'')+'x':'')+sqn(t);
+ anim={from:f,to:t,t0:performance.now(),instances:[]};sel=-1;targets=[];last=[f,t];coachMove=null;suggestedCoachMove=null;$('playCoachMove').disabled=true;clearCoachArrow();
+ const mate=!anyMove(st),chk=inCheck(st,st.turn);if(mate&&chk)n+='#';else if(chk)n+='+';hist.push(n);rebuild(t);
+ if(mate){const winner=st.turn==='w'?'b':'w';finishGame(chk?winner:'draw',chk?'Checkmate':'Stalemate')}
+ paint();ui()}
+let lastRenderedFrame=0,frameRequested=false;
+function scheduleTick(){if(!frameRequested&&!document.hidden){frameRequested=true;requestAnimationFrame(tick)}}
+function tick(now){frameRequested=false;if(document.hidden)return;scheduleTick();if(now-lastRenderedFrame<1000/60)return;lastRenderedFrame=now;
+ if(anim){const k=Math.min(1,(performance.now()-anim.t0)/450),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2,f=anim.from,t=anim.to;
+  piecePosition.set((f&7)-3.5+((t&7)-(f&7))*e,Math.sin(Math.PI*e)*.7,(f>>3)-3.5+((t>>3)-(f>>3))*e);
+  for(const instance of anim.instances){pieceTransform.makeTranslation(piecePosition.x,piecePosition.y,piecePosition.z).multiply(instance.local);instance.batch.setMatrixAt(instance.index,pieceTransform);instance.batch.instanceMatrix.needsUpdate=true}
+  if(k>=1)anim=null}
+ cam.position.set(Math.sin(th)*Math.sin(ph)*rad,Math.cos(ph)*rad,Math.cos(th)*Math.sin(ph)*rad);cam.lookAt(0,.2,0);cam.updateMatrixWorld();updateCoachOverlay();R.render(S,cam)}
+document.addEventListener('visibilitychange',scheduleTick);
+// camera + input
+let th=0,ph=.95,rad=13,drag=null;const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
+function size(){R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.fov=innerWidth<innerHeight?62:40;cam.updateProjectionMatrix()}addEventListener('resize',size);size();
+const cv=R.domElement;
+cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,moved:0};cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.moved+=Math.abs(dx)+Math.abs(dy);th-=dx*.006;ph=Math.min(1.45,Math.max(.25,ph-dy*.005));drag.x=e.clientX;drag.y=e.clientY});
+cv.addEventListener('pointerup',e=>{if(drag&&drag.moved<6)pick(e);drag=null});
+cv.addEventListener('wheel',e=>{rad=Math.min(22,Math.max(7,rad+e.deltaY*.01));e.preventDefault()},{passive:false});
+function pick(e){if(over||anim)return;mv.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(mv,cam);
+ const hit=ray.intersectObjects([...pieces.children,...sqMesh],true)[0];if(!hit)return;let i;
+ if(hit.object.userData.squares){i=hit.object.userData.squares[hit.instanceId];if(i===undefined)return}
+ else{let o=hit.object;while(o&&o.userData.sq===undefined)o=o.parent;if(!o)return;i=o.userData.sq}
+ if(myColor!=='both'&&myColor!==st.turn)return;
+ if(sel>=0&&targets.includes(i)){doMove(sel,i,true);return}
+ const p=st.b[i];if(p&&p[0]===st.turn){sel=i;targets=legal(st,i)}else{sel=-1;targets=[]}paint()}
+// ===== modes + server-hosted multiplayer =====
+function face(){th=myColor==='b'?Math.PI:0}
+$('practice').onclick=async()=>{await leave();ai=null;myColor='both';newGame();face()};
+$('flip').onclick=()=>{th+=Math.PI};
+let profile=null,onlineStream=null,matchmakingRequest=false,waitingRoomCode=null;
+function showScreen(id){['profileScreen','profileWelcome','gameMenu'].forEach(screen=>$(screen).classList.toggle('profile-hidden',screen!==id))}
+function showProfile(profileData){profile=profileData;$('profileSummary').textContent=`${profile.displayName} · #${profile.id.slice(0,8)}`;$('menuProfile').textContent=`${profile.displayName} (@${profile.username})`;$('welcomeName').textContent=`Welcome, ${profile.displayName}`;$('playerId').textContent=profile.id;showScreen('profileWelcome')}
+async function loadProfile(){const savedId=localStorage.getItem('grandmasterPlayerId'),savedToken=localStorage.getItem('grandmasterPlayerToken');if(!savedId||!savedToken){showScreen('profileScreen');return}
+ try{const response=await fetch(`/api/profile/${encodeURIComponent(savedId)}?token=${encodeURIComponent(savedToken)}`);if(!response.ok){if(response.status===401){localStorage.removeItem('grandmasterPlayerId');localStorage.removeItem('grandmasterPlayerToken')}else throw new Error('Could not load your profile')}else{showProfile({...await response.json(),token:savedToken});return}}catch(error){$('profileError').textContent=`Could not connect to the chess server: ${error.message}. Start the server and reload.`}
+ showScreen('profileScreen')}
+$('profileForm').addEventListener('submit',async e=>{e.preventDefault();const button=$('createProfile');button.disabled=true;$('profileError').textContent='';
+ try{const response=await fetch('/api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName:$('displayName').value,username:$('username').value})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not create profile');localStorage.setItem('grandmasterPlayerId',result.id);localStorage.setItem('grandmasterPlayerToken',result.token);showProfile(result)}
+ catch(error){$('profileError').textContent=error.message}finally{button.disabled=false}});
+$('continueProfile').onclick=()=>showScreen('gameMenu');
+async function postApi(url,data){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,...(profile?{playerId:profile.id,token:profile.token}:{})})});const result=await response.json();if(!response.ok)throw new Error(result.error||'The request failed');return result}
+function closeOnline(){if(onlineStream){onlineStream.close();onlineStream=null}room=null;waitingRoomCode=null;$('cancelSearch').disabled=true}
+async function leave(){if(!onlineStream)return;const oldRoom=room;
+ if(waitingRoomCode){try{await postApi('/api/rooms',{action:'cancel',code:waitingRoomCode})}catch(error){console.error(error)}}
+ else if(!oldRoom||!over){const endpoint=oldRoom?`/api/games/${oldRoom.id}/resign`:'/api/matchmaking';const action=oldRoom?'resign':'cancel';
+  try{await postApi(endpoint,{playerId:profile?.id,action})}catch(error){console.error(error)}}
+ closeOnline()}
+function startEventStream(){if(onlineStream)return Promise.resolve();return new Promise((resolve,reject)=>{onlineStream=new EventSource(`/api/events?playerId=${encodeURIComponent(profile.id)}&token=${encodeURIComponent(profile.token)}`);
+ onlineStream.addEventListener('searching',()=>setStatus('Searching for an opponent…'));
+ onlineStream.addEventListener('roomWaiting',event=>{const data=JSON.parse(event.data);waitingRoomCode=data.code;$('roomCode').value=data.code;$('cancelSearch').disabled=false;$('roomInvite').textContent=`Share code: ${data.code}`;setStatus(`Room ${data.code} is ready. Share the code with your friend.`)});
+ onlineStream.addEventListener('roomCancelled',event=>{const data=JSON.parse(event.data);if(waitingRoomCode===data.code){waitingRoomCode=null;$('cancelSearch').disabled=true;$('roomInvite').textContent='';setStatus('Room closed.')}});
+ onlineStream.addEventListener('open',resolve,{once:true});
+ onlineStream.addEventListener('cancelled',()=>setStatus('Match search cancelled'));
+ onlineStream.addEventListener('matched',event=>{const match=JSON.parse(event.data);waitingRoomCode=null;room={id:match.gameId,code:match.roomCode};ai=null;myColor=match.color;newGame();
+  (match.moves||[]).forEach(move=>doMove(move.from,move.to,false));anim=null;rebuild();face();$('menu').classList.add('hide');$('cancelSearch').disabled=true;
+  $('roomCode').value=match.roomCode||'';$('roomInvite').textContent=match.roomCode?`Room ${match.roomCode}`:'';
+  setStatus(`Playing ${match.opponent.displayName} (@${match.opponent.username}) · ${myColor==='w'?'White':'Black'}`)});
+ onlineStream.addEventListener('move',event=>{if(over||!room)return;const move=JSON.parse(event.data);doMove(move.from,move.to,false)});
+ onlineStream.addEventListener('gameover',event=>{const result=JSON.parse(event.data);$('create').disabled=false;
+  finishGame(result.reason==='stalemate'?'draw':result.winner,result.reason==='checkmate'?'Checkmate':result.reason==='stalemate'?'Stalemate':'Opponent resigned')});
+ onlineStream.onerror=()=>{if(!onlineStream||onlineStream.readyState===EventSource.CLOSED){setStatus('Disconnected from the online server. Reload to reconnect.');reject(new Error('Could not connect to the online server'))}}})}
+async function startMatchmaking(){if(!profile){showScreen('profileScreen');return}if(matchmakingRequest||onlineStream&&(!room||!over))return;
+ matchmakingRequest=true;$('create').disabled=true;
+ try{await leave();ai=null;myColor='both';setStatus('Connecting to online chess…');$('cancelSearch').disabled=false;await startEventStream();await postApi('/api/matchmaking',{playerId:profile.id,action:'join'})}
+ catch(error){closeOnline();$('create').disabled=false;setStatus(error.message)}finally{matchmakingRequest=false}}
+async function hostRoom(){if(!profile){showScreen('profileScreen');return}if(matchmakingRequest||onlineStream&&(!room||!over))return;
+ matchmakingRequest=true;$('hostRoom').disabled=true;
+ try{await leave();ai=null;myColor='both';setStatus('Connecting to room service…');await startEventStream();
+  const result=await postApi('/api/rooms',{action:'create'});waitingRoomCode=result.code;$('roomCode').value=result.code;$('roomInvite').textContent=`Share code: ${result.code}`;$('cancelSearch').disabled=false;setStatus(`Room ${result.code} is ready. Share the code with your friend.`)}
+ catch(error){closeOnline();setStatus(error.message)}finally{matchmakingRequest=false;$('hostRoom').disabled=false}}
+async function joinRoom(){if(!profile){showScreen('profileScreen');return}const code=$('roomCode').value.trim().toUpperCase();
+ if(!/^[A-HJ-NP-Z2-9]{6}$/.test(code)){setStatus('Enter a valid six-character room code.');return}
+ if(matchmakingRequest||onlineStream&&(!room||!over))return;matchmakingRequest=true;$('joinRoom').disabled=true;
+ try{await leave();ai=null;myColor='both';setStatus(`Joining room ${code}…`);await startEventStream();await postApi('/api/rooms',{action:'join',code})}
+ catch(error){setStatus(error.message);closeOnline()}finally{matchmakingRequest=false;$('joinRoom').disabled=false}}
+async function cancelMatchmaking(){if(!onlineStream||room)return;
+ try{if(waitingRoomCode)await postApi('/api/rooms',{action:'cancel',code:waitingRoomCode});else await postApi('/api/matchmaking',{playerId:profile.id,action:'cancel'})}
+ catch(error){setStatus(error.message)}closeOnline();$('create').disabled=false;$('roomInvite').textContent=''}
+async function submitMove(from,to){if(!room)return;try{await postApi(`/api/games/${room.id}/move`,{playerId:profile.id,from,to});doMove(from,to,false)}catch(error){setStatus(error.message)}}
+$('hostRoom').onclick=hostRoom;
+$('joinRoom').onclick=joinRoom;
+$('roomCode').addEventListener('keydown',event=>{if(event.key==='Enter')joinRoom()});
+$('create').onclick=startMatchmaking;
+$('cancelSearch').onclick=cancelMatchmaking;
+$('reset').onclick=()=>{if(room){setStatus('Restart is unavailable during an online match.');return}newGame()};
+$('resign').onclick=()=>{if(over)return;const winner=myColor==='b'?'White':myColor==='w'?'Black':(st.turn==='w'?'Black':'White');const winnerColor=myColor==='both'?(winner==='White'?'w':'b'):(myColor==='w'?'b':'w');$('create').disabled=false;
+ if(room){finishGame(winnerColor,'You resigned');postApi(`/api/games/${room.id}/resign`,{playerId:profile.id}).catch(error=>setStatus(error.message))}
+ else if(ai)finishGame(ai.c,'You resigned');
+ else finishGame(winnerColor,'Resignation')};
+let replay=[],ai=null,gid=0,thinking=false;
+const _dm=doMove;doMove=function(f,t,s){replay.push([f,t]);_dm(f,t,s);maybeAI()};
+const _ng=newGame;newGame=function(){replay=[];gid++;thinking=false;_ng();maybeAI()};
+// ===== AI opponent (negamax + alpha-beta) =====
+const VAL={P:100,N:320,B:330,R:500,Q:900,K:20000};
+function evalW(s){let v=0;for(let i=0;i<64;i++){const p=s.b[i];if(!p)continue;const r=i>>3,c=i&7,w=p[0]==='w',t=p[1];let x=VAL[t];const d=Math.abs(r-3.5)+Math.abs(c-3.5);
+ if(t==='P')x+=(w?6-r:r-1)*6+(c>1&&c<6?4:0);else if(t==='N'||t==='B')x+=(7-d)*6;else if(t==='Q')x+=(7-d)*1.5;else if(t==='K')x+=((w?r:7-r)>=6?15:0);
+ v+=w?x:-x}return v}
+function gen(s){const moves=[];for(let i=0;i<64;i++){const p=s.b[i];if(!p||p[0]!==s.turn)continue;
+ for(const t of legal(s,i)){const captured=s.b[t],promotion=p[1]==='P'&&(t>>3===0||t>>3===7),next=apply(s,i,t);
+  moves.push([i,t,(captured?VAL[captured[1]]*10-VAL[p[1]]:0)+(promotion?800:0)+(inCheck(next,next.turn)?30:0)])}}
+ return moves.sort((a,b)=>b[2]-a[2])}
+function search(s,d,a,b,ply=0,pv=[]){pv.length=0;const enemy=s.turn==='w'?'b':'w';
+ if(!s.b.includes(enemy+'K'))return 30000-ply;if(d===0)return evalW(s)*(s.turn==='w'?1:-1);
+ const moves=gen(s);if(!moves.length)return inCheck(s,s.turn)?-30000+ply:0;let best=-Infinity;
+ for(const[f,t]of moves){const line=[],value=-search(apply(s,f,t),d-1,-b,-a,ply+1,line);
+  if(value>best){best=value;pv.splice(0,pv.length,f,t,...line)}if(value>a)a=value;if(a>=b)break}
+ return best}
+function analyzeBest(s,maxDepth){let completed=null;
+ for(let depth=1;depth<=maxDepth;depth++){let alpha=-Infinity,bestScore=-Infinity,bestLine=[];
+  for(const[f,t]of gen(s)){const line=[],score=-search(apply(s,f,t),depth-1,-Infinity,-alpha,1,line);
+   if(score>bestScore){bestScore=score;bestLine=[f,t,...line]}if(score>alpha)alpha=score}
+  if(bestLine.length>=2)completed={move:[bestLine[0],bestLine[1]],line:bestLine,score:bestScore,depth}}
+ return completed}
+let analysisWorker=null,analysisRequestId=0;
+const pendingAnalysis=new Map();
+function createAnalysisWorker(){if(typeof Worker==='undefined'||typeof Blob==='undefined'||!URL.createObjectURL)return null;
+ const source=[
+  `const N=${JSON.stringify(N)},KG=${JSON.stringify(KG)},VAL=${JSON.stringify(VAL)};`,
+  pseudo.toString(),att.toString(),apply.toString(),inCheck.toString(),legal.toString(),
+  evalW.toString(),gen.toString(),search.toString(),analyzeBest.toString(),
+  `onmessage=event=>{const{id,state,depth}=event.data;try{postMessage({id,result:analyzeBest(state,depth)})}catch(error){postMessage({id,error:error.message})}};`
+ ].join('\n');
+ try{const blob=new Blob([source],{type:'text/javascript'});analysisWorker=new Worker(URL.createObjectURL(blob));
+  analysisWorker.onmessage=event=>{const pending=pendingAnalysis.get(event.data.id);if(!pending)return;pendingAnalysis.delete(event.data.id);
+   if(event.data.error)pending.reject(new Error(event.data.error));else pending.resolve(event.data.result)};
+  analysisWorker.onerror=event=>{console.error('Chess analysis worker failed:',event.message);analysisWorker.terminate();analysisWorker=null;
+   for(const pending of pendingAnalysis.values())pending.reject(new Error('Chess analysis worker failed'));pendingAnalysis.clear()};
+  return analysisWorker
+ }catch(error){console.error('Could not start chess analysis worker:',error);return null}}
+function requestAnalysis(state,depth){const worker=analysisWorker||createAnalysisWorker();
+ if(!worker)return new Promise(resolve=>setTimeout(()=>resolve(analyzeBest(state,Math.min(depth,2))),0));
+ return new Promise((resolve,reject)=>{const id=++analysisRequestId;pendingAnalysis.set(id,{resolve,reject});worker.postMessage({id,state,depth})})}
+async function pickAI(){const depth=[0,1,2,4][ai.lvl],result=await requestAnalysis(st,depth);return result?.move||null}
+function maybeAI(){if(!ai||over||thinking||!st||st.turn!==ai.c)return;thinking=true;const g=gid;setStatus('Computer is thinking…');
+ setTimeout(async()=>{if(g!==gid||!ai){return}try{const m=await pickAI();if(g===gid&&m&&!over)doMove(m[0],m[1],false)}
+  catch(error){console.error('Computer move failed:',error);if(g===gid)setStatus('Computer could not calculate a move. Please restart the game.')}
+  finally{if(g===gid)thinking=false}},anim?650:350)}
+let coachUnlocked=localStorage.getItem('grandmasterCoachUnlocked')==='true';
+function coachTextForMove(from,to,line,depth){const piece=st.b[from],captured=st.b[to],next=apply(st,from,to),givesCheck=inCheck(next,next.turn);
+ let explanation=inCheck(st,st.turn)?'You are in check; this move gets your king out of danger.':captured?`This captures the ${pieceNames[captured[1]]} on ${sqn(to)} and improves your material.`:givesCheck?'This move gives check and forces the opponent to answer the king threat.':'This is the strongest engine candidate: improve your piece activity and watch the opponent’s forcing replies.';
+ const reply=line.length>=4?`Likely reply: ${sqn(line[2])} to ${sqn(line[3])}. Before moving, check whether that reply attacks your queen or leaves your king exposed.`:'The search found no forced reply at this depth.';
+ return `Play ${pieceNames[piece[1]]} ${sqn(from)} to ${sqn(to)}. ${explanation}\n${reply}\nDepth ${depth} plies. No move guarantees a win; use the arrow as a calculated suggestion.`}
+const pieceNames={P:'pawn',N:'knight',B:'bishop',R:'rook',Q:'queen',K:'king'};
+if(coachUnlocked)$('coachPanel').hidden=false;
+async function requestCoachHint(){const advice=$('coachAdvice'),button=$('coachHint');
+ if(room||onlineStream){advice.textContent='Coach hints are disabled during online matches and matchmaking to keep play fair.';return}
+ if(!coachUnlocked){advice.textContent='Redeem the reward code to unlock coach hints.';return}
+ if(over){advice.textContent='The game is over. Start or restart a game to get a new hint.';return}
+ if(ai&&st.turn!==myColor){advice.textContent='Wait for your turn; the computer is thinking.';return}
+ button.disabled=true;advice.textContent='Analyzing the position at Hard depth…';
+ await new Promise(resolve=>setTimeout(resolve,30));
+ try{const result=await requestAnalysis(st,4);if(!result){advice.textContent='No legal moves are available.';return}
+  setCoachMove(...result.move);advice.textContent=coachTextForMove(...result.move,result.line,result.depth)}
+ catch(error){advice.textContent=`Could not analyze this position: ${error.message}`}
+ finally{button.disabled=false}}
+function playSuggestedMove(){if(!suggestedCoachMove)return;
+ if(room||onlineStream){$('coachAdvice').textContent='Coach moves are disabled during online matches to keep play fair.';return}
+ if(ai&&st.turn!==myColor){$('coachAdvice').textContent='Wait for your turn; the hard bot is thinking.';return}
+ const {from,to}=suggestedCoachMove;if(!legal(st,from).includes(to)){$('coachAdvice').textContent='The position changed. Find a fresh suggestion.';return}
+ doMove(from,to,false)}
+async function startCoachBot(){if(!coachUnlocked)return;
+ if(room||onlineStream){$('coachAdvice').textContent='Finish or leave the online game before starting a bot game.';return}
+ await leave();myColor='w';ai={c:'b',lvl:3};$('menu').classList.add('hide');newGame();face();setStatus('Hard bot ready · You are White. Find a move with the coach or play your turn.') }
+function setCoachUnlocked(){coachUnlocked=true;localStorage.setItem('grandmasterCoachUnlocked','true');$('coachPanel').hidden=false;$('coachAdvice').textContent='Play the hard bot or practice. Find best move to show a green arrow, or play the suggested move.'}
+$('redeemCode').onclick=()=>{if($('rewardCode').value.trim().toLowerCase()!=='balmond345'){$('coachAdvice').textContent='That reward code is not recognized.';$('coachPanel').hidden=false;return}
+ setCoachUnlocked();$('rewardCode').value=''};
+$('rewardCode').addEventListener('keydown',event=>{if(event.key==='Enter'){$('redeemCode').click()}});
+$('coachHint').onclick=requestCoachHint;
+$('playCoachMove').onclick=playSuggestedMove;
+$('playCoachBot').onclick=startCoachBot;
+$('clearCoach').onclick=()=>{coachMove=null;suggestedCoachMove=null;$('playCoachMove').disabled=true;clearCoachArrow();paint();$('coachAdvice').textContent='Hint cleared. Request another move whenever you need one.'};
+// ===== main menu =====
+function seg(id){const el=$(id);el.onclick=e=>{const b=e.target.closest('button');if(!b)return;[...el.children].forEach(x=>x.classList.remove('on'));b.classList.add('on')};return()=>el.querySelector('.on').dataset.v}
+const getLvl=seg('lvl'),getClr=seg('clr');
+$('mAI').onclick=async()=>{await leave();let c=getClr();if(c==='r')c=Math.random()<.5?'w':'b';myColor=c;ai={c:c==='w'?'b':'w',lvl:+getLvl()};$('menu').classList.add('hide');newGame();face()};
+$('mLoc').onclick=()=>{$('menu').classList.add('hide');$('practice').onclick()};
+$('mOn').onclick=()=>{$('menu').classList.add('hide');setStatus('Host a room or enter your friend’s room code.');$('roomCode').focus()};
+$('rematch').onclick=async()=>{if(room){$('gameResult').hidden=true;await startMatchmaking();return}
+ const color=myColor,bot=ai?{...ai}:null;$('gameResult').hidden=true;$('menu').classList.add('hide');myColor=color;ai=bot;newGame();face()};
+$('resultMenu').onclick=async()=>{await leave();ai=null;myColor='both';newGame();showScreen(profile?'gameMenu':'profileScreen');$('menu').classList.remove('hide')};
+$('menuBtn').onclick=()=>{if(profile)showScreen('gameMenu');$('menu').classList.remove('hide')};
+$('changeProfile').onclick=()=>{localStorage.removeItem('grandmasterPlayerId');localStorage.removeItem('grandmasterPlayerToken');profile=null;leave();showScreen('profileScreen')};
+newGame();scheduleTick();loadProfile();
+</script></body></html>

@@ -1,0 +1,12 @@
+{
+  "name": "grandmaster-chess",
+  "version": "1.0.0",
+  "private": true,
+  "description": "3D chess with server-hosted player profiles and online matchmaking",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
