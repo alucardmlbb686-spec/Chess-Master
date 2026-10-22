@@ -21,6 +21,9 @@ button:disabled{opacity:.55;cursor:default}
 #status{margin:8px 0;padding:8px;border-radius:8px;background:rgba(214,168,90,.14);font-weight:600}
 #coachPanel{border:1px solid rgba(74,222,128,.35);border-radius:9px;padding:9px;margin:8px 0;color:var(--text)}
 #coachPanel[hidden]{display:none}
+#coachHeader{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#coachHeader button,#showCoach{padding:5px 9px;font-size:12px}
+#coachToggleRow[hidden]{display:none}
 #coachPanel p{font-size:12px;color:var(--mut);margin:6px 0}
 #coachAdvice{font-size:12px;line-height:1.5;white-space:pre-line}
 #coachPanel .row{flex-wrap:wrap}
@@ -83,8 +86,9 @@ button:disabled{opacity:.55;cursor:default}
 <div class="row lobby-controls"><button class="g" id="cancelSearch" disabled>Cancel search</button><span id="roomInvite" class="profile-chip"></span></div>
 <div class="row lobby-controls"><button class="g" id="practice">Practice</button><span id="profileSummary" class="profile-chip"></span></div>
 <div class="row lobby-controls"><input id="rewardCode" maxlength="24" placeholder="Reward code" aria-label="Reward code"><button class="g" id="redeemCode">Redeem</button></div>
-<div id="coachPanel" hidden><strong>Grandmaster coach unlocked</strong><p>Single-player hints only · Hard engine · depth 4</p><div class="row"><button id="coachHint">Find best move</button><button class="g" id="playCoachMove" disabled>Play suggested move</button></div>
+<div id="coachPanel" hidden><div id="coachHeader"><strong>Grandmaster coach unlocked</strong><button class="g" id="hideCoach" type="button" aria-controls="coachPanel" aria-expanded="true">Hide</button></div><p>Single-player hints only · Hard engine · depth 4</p><div class="row"><button id="coachHint">Find best move</button><button class="g" id="playCoachMove" disabled>Play suggested move</button></div>
 <div class="row"><button class="g" id="playCoachBot">Play the hard bot</button><button class="g" id="clearCoach">Clear arrow</button></div><div id="coachAdvice" role="status" aria-live="polite"></div></div>
+<div class="row" id="coachToggleRow" hidden><button class="g" id="showCoach" type="button" aria-controls="coachPanel" aria-expanded="false">Show coach</button></div>
 <div id="status">Choose a mode to begin</div>
 <div id="cap"></div><div id="moves"></div>
 <div class="row" id="gameActions"><button class="g" id="menuBtn">☰ Menu</button><button class="g" id="flip">Flip</button><button class="g" id="reset">Restart</button><button class="g" id="resign">Resign</button></div>
@@ -410,12 +414,15 @@ function maybeAI(){if(!ai||over||thinking||!st||st.turn!==ai.c)return;thinking=t
   catch(error){console.error('Computer move failed:',error);if(g===gid)setStatus('Computer could not calculate a move. Please restart the game.')}
   finally{if(g===gid)thinking=false}},anim?650:350)}
 let coachUnlocked=localStorage.getItem('grandmasterCoachUnlocked')==='true';
+function setCoachPanelHidden(hidden,remember=true){$('coachPanel').hidden=hidden;$('coachToggleRow').hidden=!coachUnlocked||!hidden;
+ $('hideCoach').setAttribute('aria-expanded',String(!hidden));$('showCoach').setAttribute('aria-expanded',String(!hidden));
+ if(remember)localStorage.setItem('grandmasterCoachHidden',String(hidden))}
 function coachTextForMove(from,to,line,depth){const piece=st.b[from],captured=st.b[to],next=apply(st,from,to),givesCheck=inCheck(next,next.turn);
  let explanation=inCheck(st,st.turn)?'You are in check; this move gets your king out of danger.':captured?`This captures the ${pieceNames[captured[1]]} on ${sqn(to)} and improves your material.`:givesCheck?'This move gives check and forces the opponent to answer the king threat.':'This is the strongest engine candidate: improve your piece activity and watch the opponent’s forcing replies.';
  const reply=line.length>=4?`Likely reply: ${sqn(line[2])} to ${sqn(line[3])}. Before moving, check whether that reply attacks your queen or leaves your king exposed.`:'The search found no forced reply at this depth.';
  return `Play ${pieceNames[piece[1]]} ${sqn(from)} to ${sqn(to)}. ${explanation}\n${reply}\nDepth ${depth} plies. No move guarantees a win; use the arrow as a calculated suggestion.`}
 const pieceNames={P:'pawn',N:'knight',B:'bishop',R:'rook',Q:'queen',K:'king'};
-if(coachUnlocked)$('coachPanel').hidden=false;
+if(coachUnlocked)setCoachPanelHidden(localStorage.getItem('grandmasterCoachHidden')==='true',false);
 async function requestCoachHint(){const advice=$('coachAdvice'),button=$('coachHint');
  if(room||onlineStream){advice.textContent='Coach hints are disabled during online matches and matchmaking to keep play fair.';return}
  if(!coachUnlocked){advice.textContent='Redeem the reward code to unlock coach hints.';return}
@@ -435,11 +442,13 @@ function playSuggestedMove(){if(!suggestedCoachMove)return;
 async function startCoachBot(){if(!coachUnlocked)return;
  if(room||onlineStream){$('coachAdvice').textContent='Finish or leave the online game before starting a bot game.';return}
  await leave();myColor='w';ai={c:'b',lvl:3};setGameActive(true);$('menu').classList.add('hide');newGame();face();setStatus('Hard bot ready · You are White. Find a move with the coach or play your turn.') }
-function setCoachUnlocked(){coachUnlocked=true;localStorage.setItem('grandmasterCoachUnlocked','true');$('coachPanel').hidden=false;$('coachAdvice').textContent='Play the hard bot or practice. Find best move to show a green arrow, or play the suggested move.'}
+function setCoachUnlocked(){coachUnlocked=true;localStorage.setItem('grandmasterCoachUnlocked','true');setCoachPanelHidden(false);$('coachAdvice').textContent='Play the hard bot or practice. Find best move to show a green arrow, or play the suggested move.'}
 $('redeemCode').onclick=()=>{if($('rewardCode').value.trim().toLowerCase()!=='balmond345'){$('coachAdvice').textContent='That reward code is not recognized.';$('coachPanel').hidden=false;return}
  setCoachUnlocked();$('rewardCode').value=''};
 $('rewardCode').addEventListener('keydown',event=>{if(event.key==='Enter'){$('redeemCode').click()}});
 $('coachHint').onclick=requestCoachHint;
+$('hideCoach').onclick=()=>setCoachPanelHidden(true);
+$('showCoach').onclick=()=>setCoachPanelHidden(false);
 $('playCoachMove').onclick=playSuggestedMove;
 $('playCoachBot').onclick=startCoachBot;
 $('clearCoach').onclick=()=>{coachMove=null;suggestedCoachMove=null;$('playCoachMove').disabled=true;clearCoachArrow();paint();$('coachAdvice').textContent='Hint cleared. Request another move whenever you need one.'};
