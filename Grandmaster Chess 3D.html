@@ -47,6 +47,7 @@ button:disabled{opacity:.55;cursor:default}
  #gamePanel.game-active #cap{min-height:18px;font-size:16px}
  #gamePanel.game-active #gameActions{display:flex;gap:6px;margin:6px 0 0}
  #gamePanel.game-active #gameActions button{flex:1;min-width:0;padding:8px 6px;font-size:12px}
+ #gamePanel.game-active.coach-unlocked .reward-controls{display:none}
  #hiddenPanelActions{left:8px;right:8px;top:calc(8px + env(safe-area-inset-top,0px))}
  #hiddenPanelActions button{flex:1}
  #hiddenCodePanel{left:8px;right:8px;top:calc(60px + env(safe-area-inset-top,0px));width:auto}
@@ -54,6 +55,11 @@ button:disabled{opacity:.55;cursor:default}
 }
 #gamePanel.coach-view{left:auto;right:12px}
 #gamePanel.game-active .lobby-controls{display:none}
+#onlineCoachConsent[hidden]{display:none}
+#onlineCoachConsent{margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:12px}
+#onlineCoachConsent label{display:flex;align-items:center;gap:8px;font-weight:600}
+#allowOnlineCoach{flex:none;width:18px;height:18px;min-height:18px;margin:0;accent-color:var(--acc)}
+#coachConsentStatus{margin-top:4px;color:var(--mut)}
 @media(max-width:640px){#gamePanel.coach-view{left:12px;right:12px;top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));max-height:34%}}
 #gamePanel.game-active #menuBtn{display:none}
 #panelHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
@@ -97,8 +103,9 @@ button:disabled{opacity:.55;cursor:default}
 <div class="row lobby-controls"><input id="roomCode" maxlength="6" placeholder="ROOM CODE" aria-label="Room code"><button class="g" id="joinRoom">Join room</button></div>
 <div class="row lobby-controls"><button class="g" id="cancelSearch" disabled>Cancel search</button><span id="roomInvite" class="profile-chip"></span></div>
 <div class="row lobby-controls"><button class="g" id="practice">Practice</button><span id="profileSummary" class="profile-chip"></span></div>
-<div class="row lobby-controls"><input id="rewardCode" maxlength="24" placeholder="Reward code" aria-label="Reward code"><button class="g" id="redeemCode">Redeem</button></div>
-<div id="coachPanel" hidden><strong>Grandmaster coach unlocked</strong><p>Single-player hints only · Hard engine · depth 4</p><div class="row"><button id="coachHint">Find best move</button><button class="g" id="playCoachMove" disabled>Play suggested move</button></div>
+<div class="row reward-controls"><input id="rewardCode" maxlength="24" placeholder="Reward code" aria-label="Reward code"><button class="g" id="redeemCode">Redeem</button></div>
+<div id="onlineCoachConsent" hidden><label><input id="allowOnlineCoach" type="checkbox"> Allow coach hints in this game</label><div id="coachConsentStatus" aria-live="polite">Both players must agree before coach hints are available online.</div></div>
+<div id="coachPanel" hidden><strong>Grandmaster coach unlocked</strong><p>Hard engine · depth 4 · online hints require both players</p><div class="row"><button id="coachHint">Find best move</button><button class="g" id="playCoachMove" disabled>Play suggested move</button></div>
 <div class="row"><button class="g" id="playCoachBot">Play the hard bot</button><button class="g" id="clearCoach">Clear arrow</button></div><div id="coachAdvice" role="status" aria-live="polite"></div></div>
 <div id="status">Choose a mode to begin</div>
 <div id="cap"></div><div id="moves"></div>
@@ -329,7 +336,11 @@ $('profileForm').addEventListener('submit',async e=>{e.preventDefault();const bu
  catch(error){$('profileError').textContent=error.message}finally{button.disabled=false}});
 $('continueProfile').onclick=()=>showScreen('gameMenu');
 async function postApi(url,data){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,...(profile?{playerId:profile.id,token:profile.token}:{})})});const result=await response.json();if(!response.ok)throw new Error(result.error||'The request failed');return result}
-function closeOnline(){if(onlineStream){onlineStream.close();onlineStream=null}room=null;waitingRoomCode=null;$('cancelSearch').disabled=true}
+function updateCoachPermission(permission){if(!room)return;room.coachAllowed=permission.allowed;$('allowOnlineCoach').checked=Boolean(permission.consent?.[myColor]);
+ $('coachConsentStatus').textContent=permission.allowed?'Both players agreed. Coach hints are enabled for this game.':
+  permission.consent?.[myColor]?'You agreed. Waiting for your opponent to agree.':
+  permission.consent?.[myColor==='w'?'b':'w']?'Your opponent agreed. Opt in to enable coach hints.':'Both players must agree before coach hints are available online.'}
+function closeOnline(){if(onlineStream){onlineStream.close();onlineStream=null}room=null;waitingRoomCode=null;$('onlineCoachConsent').hidden=true;$('allowOnlineCoach').checked=false;$('allowOnlineCoach').disabled=false;$('cancelSearch').disabled=true}
 async function leave(){if(!onlineStream)return;const oldRoom=room;
  if(waitingRoomCode){try{await postApi('/api/rooms',{action:'cancel',code:waitingRoomCode})}catch(error){console.error(error)}}
  else if(!oldRoom||!over){const endpoint=oldRoom?`/api/games/${oldRoom.id}/resign`:'/api/matchmaking';const action=oldRoom?'resign':'cancel';
@@ -342,9 +353,12 @@ function startEventStream(){if(onlineStream)return Promise.resolve();return new 
  onlineStream.addEventListener('open',resolve,{once:true});
  onlineStream.addEventListener('cancelled',()=>setStatus('Match search cancelled'));
  onlineStream.addEventListener('matched',event=>{const match=JSON.parse(event.data);waitingRoomCode=null;room={id:match.gameId,code:match.roomCode};ai=null;myColor=match.color;setGameActive(true);newGame();
+  room.coachAllowed=match.coachAllowed===true;$('onlineCoachConsent').hidden=false;
+  updateCoachPermission({allowed:room.coachAllowed,consent:match.coachConsent||{w:false,b:false}});
   (match.moves||[]).forEach(move=>doMove(move.from,move.to,false));anim=null;rebuild();face();$('menu').classList.add('hide');$('cancelSearch').disabled=true;
   $('roomCode').value=match.roomCode||'';$('roomInvite').textContent=match.roomCode?`Room ${match.roomCode}`:'';
   setStatus(`Playing ${match.opponent.displayName} (@${match.opponent.username}) · ${myColor==='w'?'White':'Black'}`)});
+ onlineStream.addEventListener('coachPermission',event=>{if(room)updateCoachPermission(JSON.parse(event.data))});
  onlineStream.addEventListener('move',event=>{if(over||!room)return;const move=JSON.parse(event.data);doMove(move.from,move.to,false)});
  onlineStream.addEventListener('gameover',event=>{const result=JSON.parse(event.data);$('create').disabled=false;
   finishGame(result.reason==='stalemate'?'draw':result.winner,result.reason==='checkmate'?'Checkmate':result.reason==='stalemate'?'Stalemate':'Opponent resigned')});
@@ -368,6 +382,11 @@ async function cancelMatchmaking(){if(!onlineStream||room)return;
  try{if(waitingRoomCode)await postApi('/api/rooms',{action:'cancel',code:waitingRoomCode});else await postApi('/api/matchmaking',{playerId:profile.id,action:'cancel'})}
  catch(error){setStatus(error.message)}closeOnline();$('create').disabled=false;$('roomInvite').textContent=''}
 async function submitMove(from,to){if(!room)return;try{await postApi(`/api/games/${room.id}/move`,{playerId:profile.id,from,to});doMove(from,to,false)}catch(error){setStatus(error.message)}}
+async function setOnlineCoachConsent(enabled){if(!room)return;const checkbox=$('allowOnlineCoach');checkbox.disabled=true;
+ try{const permission=await postApi(`/api/games/${room.id}/coach`,{enabled});updateCoachPermission(permission)}
+ catch(error){checkbox.checked=!enabled;$('coachConsentStatus').textContent=error.message}
+ finally{checkbox.disabled=false}}
+$('allowOnlineCoach').addEventListener('change',event=>setOnlineCoachConsent(event.target.checked));
 $('hostRoom').onclick=hostRoom;
 $('joinRoom').onclick=joinRoom;
 $('roomCode').addEventListener('keydown',event=>{if(event.key==='Enter')joinRoom()});
@@ -427,6 +446,7 @@ function maybeAI(){if(!ai||over||thinking||!st||st.turn!==ai.c)return;thinking=t
   catch(error){console.error('Computer move failed:',error);if(g===gid)setStatus('Computer could not calculate a move. Please restart the game.')}
   finally{if(g===gid)thinking=false}},anim?650:350)}
 let coachUnlocked=localStorage.getItem('grandmasterCoachUnlocked')==='true';
+if(coachUnlocked)$('gamePanel').classList.add('coach-unlocked');
 function setPanelHidden(hidden){$('gamePanel').hidden=hidden;$('hiddenPanelActions').hidden=!hidden;
  $('hidePanel').setAttribute('aria-expanded',String(!hidden));$('showPanel').setAttribute('aria-expanded',String(!hidden));
  if(!hidden){$('hiddenCodePanel').hidden=true;$('openHiddenCode').setAttribute('aria-expanded','false')}}
@@ -437,25 +457,32 @@ function coachTextForMove(from,to,line,depth){const piece=st.b[from],captured=st
 const pieceNames={P:'pawn',N:'knight',B:'bishop',R:'rook',Q:'queen',K:'king'};
 if(coachUnlocked)$('coachPanel').hidden=false;
 async function requestCoachHint(){const advice=$('coachAdvice'),button=$('coachHint');
- if(room||onlineStream){advice.textContent='Coach hints are disabled during online matches and matchmaking to keep play fair.';return}
+ if(onlineStream&&!room){advice.textContent='Coach hints are unavailable while searching for an online match.';return}
  if(!coachUnlocked){advice.textContent='Redeem the reward code to unlock coach hints.';return}
+ if(room&&!room.coachAllowed){advice.textContent='Both players must opt in above before online coach hints are available.';return}
+ if(room&&st.turn!==myColor){advice.textContent='Wait for your turn before asking the coach.';return}
  if(over){advice.textContent='The game is over. Start or restart a game to get a new hint.';return}
  if(ai&&st.turn!==myColor){advice.textContent='Wait for your turn; the computer is thinking.';return}
  button.disabled=true;advice.textContent='Analyzing the position at Hard depth…';
  await new Promise(resolve=>setTimeout(resolve,30));
- try{const result=await requestAnalysis(st,4);if(!result){advice.textContent='No legal moves are available.';return}
+ try{const position=st,gameId=room?.id,result=await requestAnalysis(position,4);
+  if(st!==position||room?.id!==gameId){advice.textContent='The position changed. Request a fresh hint.';return}
+  if(room&&!room.coachAllowed){advice.textContent='Online coach consent was withdrawn. Both players must opt in again.';return}
+  if(!result){advice.textContent='No legal moves are available.';return}
   setCoachMove(...result.move);advice.textContent=coachTextForMove(...result.move,result.line,result.depth)}
  catch(error){advice.textContent=`Could not analyze this position: ${error.message}`}
  finally{button.disabled=false}}
 function playSuggestedMove(){if(!suggestedCoachMove)return;
- if(room||onlineStream){$('coachAdvice').textContent='Coach moves are disabled during online matches to keep play fair.';return}
+ if(onlineStream&&!room){$('coachAdvice').textContent='Suggested moves are unavailable while searching for an online match.';return}
+ if(room&&!room.coachAllowed){$('coachAdvice').textContent='Both players must opt in before using coach moves online.';return}
+ if(room&&st.turn!==myColor){$('coachAdvice').textContent='Wait for your turn before playing a suggested move.';return}
  if(ai&&st.turn!==myColor){$('coachAdvice').textContent='Wait for your turn; the hard bot is thinking.';return}
  const {from,to}=suggestedCoachMove;if(!legal(st,from).includes(to)){$('coachAdvice').textContent='The position changed. Find a fresh suggestion.';return}
- doMove(from,to,false)}
+ doMove(from,to,Boolean(room))}
 async function startCoachBot(){if(!coachUnlocked)return;
  if(room||onlineStream){$('coachAdvice').textContent='Finish or leave the online game before starting a bot game.';return}
  await leave();myColor='w';ai={c:'b',lvl:3};setGameActive(true);$('menu').classList.add('hide');newGame();face();setStatus('Hard bot ready · You are White. Find a move with the coach or play your turn.') }
-function setCoachUnlocked(){coachUnlocked=true;localStorage.setItem('grandmasterCoachUnlocked','true');$('coachPanel').hidden=false;$('coachAdvice').textContent='Play the hard bot or practice. Find best move to show a green arrow, or play the suggested move.'}
+function setCoachUnlocked(){coachUnlocked=true;localStorage.setItem('grandmasterCoachUnlocked','true');$('gamePanel').classList.add('coach-unlocked');$('coachPanel').hidden=false;$('coachAdvice').textContent='Play the hard bot or practice. Find best move to show a green arrow, or play the suggested move.'}
 function redeemCoachCode(input,fromHiddenPanel=false){if(input.value.trim().toLowerCase()!=='balmond345'){
  const message='That reward code is not recognized.';
  if(fromHiddenPanel)$('hiddenCodeMessage').textContent=message;
