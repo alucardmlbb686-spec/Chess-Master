@@ -14,6 +14,6 @@ The default profile store is `data/profiles.json`. Free Render instances use an 
 
 Active games, room codes, matchmaking queues, and event-stream connections are held in server memory. Keep the service at **one instance**: scaling to multiple instances will split this state between servers. Active games and rooms also end when the service restarts or deploys.
 
-Computer play includes Easy, Medium, Hard, Expert, Immortal Expert, and Impossible. Higher levels search deeper with a longer calculation budget. Impossible is the strongest setting in the built-in engine, not a guarantee that the computer can never lose.
+Computer play includes Easy, Medium, Hard, Expert, Immortal Expert, and Impossible. Expert through Impossible use the locally hosted Stockfish.js 19 lite engine; Impossible uses its maximum skill setting and a 12-second calculation per move. This is extremely strong, but no chess engine can guarantee it will never lose. Stockfish.js is distributed under GPL-3.0; its license is included at [vendor/stockfish/Copying.txt](./vendor/stockfish/Copying.txt). The engine source is available at [github.com/nmrugg/stockfish.js](https://github.com/nmrugg/stockfish.js).
 
 Coach analysis runs locally in the player's browser. Online coach suggestions are submitted as ordinary moves and are still validated as legal by the server.

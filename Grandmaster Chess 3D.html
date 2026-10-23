@@ -453,8 +453,44 @@ function createAnalysisWorker(){if(typeof Worker==='undefined'||typeof Blob==='u
 function requestAnalysis(state,depth,timeLimit=1800){const worker=analysisWorker||createAnalysisWorker();
  if(!worker)return new Promise(resolve=>setTimeout(()=>resolve(analyzeBest(state,Math.min(depth,2))),0));
  return new Promise((resolve,reject)=>{const id=++analysisRequestId;pendingAnalysis.set(id,{resolve,reject});worker.postMessage({id,state,depth,timeLimit})})}
-const AI_LEVELS={1:{depth:1,time:150},2:{depth:2,time:300},3:{depth:4,time:700},4:{depth:5,time:1500},5:{depth:6,time:3000},6:{depth:8,time:5000}};
-async function pickAI(){const level=AI_LEVELS[ai.lvl],result=await requestAnalysis(st,level.depth,level.time);return result?.move||null}
+let stockfishWorker=null,stockfishReady=null,stockfishMoveResolve=null,stockfishMoveReject=null;
+function createStockfishWorker(){if(stockfishWorker)return stockfishReady;
+ if(typeof Worker==='undefined')return Promise.reject(new Error('This browser does not support the strong computer engine'));
+ stockfishWorker=new Worker('/vendor/stockfish/stockfish-19-lite-single.js');
+ stockfishReady=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('The strong computer engine took too long to start')),30000);
+  stockfishWorker.onerror=event=>{clearTimeout(timer);if(stockfishMoveReject){stockfishMoveReject(new Error(event.message||'The strong computer engine failed'));stockfishMoveResolve=null;stockfishMoveReject=null}reject(new Error(event.message||'The strong computer engine failed to start'))};
+  stockfishWorker.onmessage=event=>{const line=typeof event.data==='string'?event.data:event.data?.line;
+   if(!line)return;
+   if(line==='uciok'){stockfishWorker.postMessage('setoption name Threads value 1');stockfishWorker.postMessage('setoption name Hash value 32');stockfishWorker.postMessage('isready')}
+   else if(line==='readyok'){clearTimeout(timer);resolve()}
+   else if(line.startsWith('bestmove ')){const move=line.split(/\s+/)[1];const finish=stockfishMoveResolve;stockfishMoveResolve=null;stockfishMoveReject=null;if(finish)finish(move)}
+  };
+  stockfishWorker.postMessage('uci')}).catch(error=>{stockfishWorker?.terminate();stockfishWorker=null;stockfishReady=null;throw error});
+ return stockfishReady}
+function fenForPosition(state){const rows=[];
+ for(let row=0;row<8;row++){let empty=0,line='';for(let col=0;col<8;col++){const piece=state.b[row*8+col];if(!piece){empty++;continue}
+  if(empty){line+=empty;empty=0}const symbol=piece[1];line+=piece[0]==='w'?symbol:symbol.toLowerCase()}
+  if(empty)line+=empty;rows.push(line)}
+ const castling=['wK','wQ','bK','bQ'].filter(right=>state.cas[right]).map(right=>({wK:'K',wQ:'Q',bK:'k',bQ:'q'}[right])).join('')||'-';
+ const ep=state.ep<0?'-':sqn(state.ep);
+ return `${rows.join('/')} ${state.turn} ${castling} ${ep} 0 1`}
+function squareFromUci(square){return (8-Number(square[1]))*8+'abcdefgh'.indexOf(square[0])}
+async function pickStockfishAI(level){await createStockfishWorker();
+ return new Promise((resolve,reject)=>{if(stockfishMoveResolve)return reject(new Error('The computer engine is already calculating a move'));
+  stockfishMoveResolve=move=>{if(!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)){resolve(null);return}
+   const from=squareFromUci(move.slice(0,2)),to=squareFromUci(move.slice(2,4));
+   if(!legal(st,from).includes(to)){reject(new Error('The strong computer engine returned an illegal move'));return}
+   resolve([from,to])};
+  stockfishMoveReject=reject;
+  stockfishWorker.postMessage(`setoption name Skill Level value ${level.skill}`);
+  stockfishWorker.postMessage(`position fen ${fenForPosition(st)}`);
+  stockfishWorker.postMessage(`go movetime ${level.time}`)
+ })}
+const AI_LEVELS={1:{depth:1,time:150},2:{depth:2,time:300},3:{depth:4,time:700},
+ 4:{skill:8,time:1500},5:{skill:16,time:4000},6:{skill:20,time:12000}};
+async function pickAI(){const level=AI_LEVELS[ai.lvl];
+ if(ai.lvl>=4)return pickStockfishAI(level);
+ const result=await requestAnalysis(st,level.depth,level.time);return result?.move||null}
 function maybeAI(){if(!ai||over||thinking||!st||st.turn!==ai.c)return;thinking=true;const g=gid;setStatus('Computer is thinking…');
  setTimeout(async()=>{if(g!==gid||!ai){return}try{const m=await pickAI();if(g===gid&&m&&!over)doMove(m[0],m[1],false)}
   catch(error){console.error('Computer move failed:',error);if(g===gid)setStatus('Computer could not calculate a move. Please restart the game.')}
@@ -520,8 +556,9 @@ function seg(id){const el=$(id);el.onclick=e=>{const b=e.target.closest('button'
 const getLvl=()=>Number($('lvl').value),getClr=seg('clr');
 $('lvl').addEventListener('change',()=>{$('difficultyNote').textContent=[
  '','Easy · looks a move ahead.','Medium · a balanced casual opponent.',
- 'Hard · searches several moves ahead.','Expert · deeper tactical search.',
- 'Immortal Expert · longer, deeper analysis.','Impossible · maximum search time and depth; still not literally unbeatable.'
+ 'Hard · searches several moves ahead.','Expert · Stockfish at strong club level.',
+ 'Immortal Expert · Stockfish at a very high playing strength.',
+ 'Impossible · maximum Stockfish strength with a 12-second calculation; extremely strong, but not literally unbeatable.'
 ][getLvl()]});
 $('mAI').onclick=async()=>{await leave();let c=getClr();if(c==='r')c=Math.random()<.5?'w':'b';myColor=c;ai={c:c==='w'?'b':'w',lvl:+getLvl()};setGameActive(true);$('menu').classList.add('hide');newGame();face()};
 $('mLoc').onclick=()=>{$('menu').classList.add('hide');$('practice').onclick()};

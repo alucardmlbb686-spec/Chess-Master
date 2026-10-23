@@ -6,6 +6,21 @@ const crypto = require('node:crypto');
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const htmlPath = path.join(__dirname, 'Grandmaster Chess 3D.html');
+const stockfishDir = path.join(__dirname, 'vendor', 'stockfish');
+const engineAssets = new Map([
+  ['/vendor/stockfish/stockfish-19-lite-single.js', {
+    path: path.join(stockfishDir, 'stockfish-19-lite-single.js'),
+    type: 'text/javascript; charset=utf-8'
+  }],
+  ['/vendor/stockfish/stockfish-19-lite-single.wasm', {
+    path: path.join(stockfishDir, 'stockfish-19-lite-single.wasm'),
+    type: 'application/wasm'
+  }],
+  ['/vendor/stockfish/Copying.txt', {
+    path: path.join(stockfishDir, 'Copying.txt'),
+    type: 'text/plain; charset=utf-8'
+  }]
+]);
 const dataDir = process.env.CHESS_DATA_DIR || path.join(__dirname, 'data');
 const profilesPath = path.join(dataDir, 'profiles.json');
 fs.mkdirSync(dataDir, { recursive: true });
@@ -277,6 +292,17 @@ const server = http.createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
     if (request.method === 'GET' && url.pathname === '/healthz') {
       return json(response, 200, { status: 'ok' });
+    }
+
+    const engineAsset = request.method === 'GET' && engineAssets.get(url.pathname);
+    if (engineAsset) {
+      if (!fs.existsSync(engineAsset.path)) return json(response, 404, { error: 'Chess engine asset not found' });
+      response.writeHead(200, {
+        'Content-Type': engineAsset.type,
+        'Cache-Control': 'public, max-age=31536000, immutable'
+      });
+      fs.createReadStream(engineAsset.path).pipe(response);
+      return;
     }
 
     if (request.method === 'GET' && url.pathname === '/api/events') {
