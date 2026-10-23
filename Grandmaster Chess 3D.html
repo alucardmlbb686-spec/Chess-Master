@@ -82,6 +82,8 @@ button:disabled{opacity:.55;cursor:default}
 .seg{display:flex;gap:6px}.seg button{flex:1}
 .seg button.on{background:var(--acc);color:#1a1405}
 .seg button:not(.on){background:transparent;color:var(--text);border:1px solid var(--line)}
+select{width:100%;min-height:42px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);font:inherit}
+#difficultyNote{min-height:32px;margin:6px 0;color:var(--mut);font-size:12px}
 .big{width:100%;padding:12px;margin-top:8px;font-size:14px}
 .profile-form{display:grid;gap:8px}
 .profile-form label{font-size:12px;color:var(--mut)}
@@ -121,7 +123,11 @@ button:disabled{opacity:.55;cursor:default}
 <section id="profileWelcome" class="profile-hidden"><h2 id="welcomeName"></h2><div class="sub">Your player profile is ready</div><div class="lbl">Unique player ID</div><div id="playerId" class="profile-id"></div><button class="big" id="continueProfile">Continue to chess</button></section>
 <section id="gameMenu" class="profile-hidden"><h2>♞ Grandmaster Chess</h2><div class="sub">Create your profile, host a private room, and share its code with a friend</div>
 <div class="lbl">Play the computer</div>
-<div class="seg" id="lvl"><button data-v="1">Easy</button><button data-v="2" class="on">Medium</button><button data-v="3">Hard</button></div>
+<select id="lvl" aria-label="Computer difficulty">
+<option value="1">Easy</option><option value="2" selected>Medium</option><option value="3">Hard</option>
+<option value="4">Expert</option><option value="5">Immortal Expert</option><option value="6">Impossible</option>
+</select>
+<div id="difficultyNote" role="status" aria-live="polite">Balanced play for a casual game.</div>
 <div class="lbl">Your color</div>
 <div class="seg" id="clr"><button data-v="w" class="on">White</button><button data-v="b">Black</button><button data-v="r">Random</button></div>
 <button class="big" id="mAI">Start vs Computer</button>
@@ -400,16 +406,30 @@ function gen(s){const moves=[];for(let i=0;i<64;i++){const p=s.b[i];if(!p||p[0]!
  for(const t of legal(s,i)){const captured=s.b[t],promotion=p[1]==='P'&&(t>>3===0||t>>3===7),next=apply(s,i,t);
   moves.push([i,t,(captured?VAL[captured[1]]*10-VAL[p[1]]:0)+(promotion?800:0)+(inCheck(next,next.turn)?30:0)])}}
  return moves.sort((a,b)=>b[2]-a[2])}
-function search(s,d,a,b,ply=0,pv=[]){pv.length=0;const enemy=s.turn==='w'?'b':'w';
- if(!s.b.includes(enemy+'K'))return 30000-ply;if(d===0)return evalW(s)*(s.turn==='w'?1:-1);
- const moves=gen(s);if(!moves.length)return inCheck(s,s.turn)?-30000+ply:0;let best=-Infinity;
+function positionKey(s){return `${s.b.join(',')}|${s.turn}|${+s.cas.wK}${+s.cas.wQ}${+s.cas.bK}${+s.cas.bQ}|${s.ep}`}
+let searchDeadline=Infinity,searchTable=new Map(),searchNodes=0;
+const SEARCH_TIMEOUT={};
+function search(s,d,a,b,ply=0,pv=[]){pv.length=0;if(Date.now()>=searchDeadline)throw SEARCH_TIMEOUT;searchNodes++;
+ const enemy=s.turn==='w'?'b':'w';if(!s.b.includes(enemy+'K'))return 30000-ply;
+ const alphaStart=a,betaStart=b,key=positionKey(s),cached=searchTable.get(key);
+ if(cached&&cached.depth>=d){if(cached.bound==='exact'){if(cached.move)pv.push(...cached.move);return cached.score}
+  if(cached.bound==='lower')a=Math.max(a,cached.score);else if(cached.bound==='upper')b=Math.min(b,cached.score);
+  if(a>=b){if(cached.move)pv.push(...cached.move);return cached.score}}
+ const moves=gen(s);if(!moves.length)return inCheck(s,s.turn)?-30000+ply:0;
+ if(d===0)return evalW(s)*(s.turn==='w'?1:-1);
+ if(cached?.move){const index=moves.findIndex(([f,t])=>f===cached.move[0]&&t===cached.move[1]);if(index>0)moves.unshift(...moves.splice(index,1))}
+ let best=-Infinity,bestMove=null;
  for(const[f,t]of moves){const line=[],value=-search(apply(s,f,t),d-1,-b,-a,ply+1,line);
-  if(value>best){best=value;pv.splice(0,pv.length,f,t,...line)}if(value>a)a=value;if(a>=b)break}
+  if(value>best){best=value;bestMove=[f,t];pv.splice(0,pv.length,f,t,...line)}if(value>a)a=value;if(a>=b)break}
+ if(Math.abs(best)<29000){if(searchTable.size>=150000)searchTable.delete(searchTable.keys().next().value);
+  searchTable.set(key,{depth:d,score:best,bound:best<=alphaStart?'upper':best>=betaStart?'lower':'exact',move:bestMove})}
  return best}
-function analyzeBest(s,maxDepth){let completed=null;
+function analyzeBest(s,maxDepth,timeLimit=1800){let completed=null;searchDeadline=Date.now()+timeLimit;searchTable.clear();searchNodes=0;
  for(let depth=1;depth<=maxDepth;depth++){let alpha=-Infinity,bestScore=-Infinity,bestLine=[];
-  for(const[f,t]of gen(s)){const line=[],score=-search(apply(s,f,t),depth-1,-Infinity,-alpha,1,line);
-   if(score>bestScore){bestScore=score;bestLine=[f,t,...line]}if(score>alpha)alpha=score}
+  try{for(const[f,t]of gen(s)){if(Date.now()>=searchDeadline)throw SEARCH_TIMEOUT;
+   const line=[],score=-search(apply(s,f,t),depth-1,-Infinity,-alpha,1,line);
+   if(score>bestScore){bestScore=score;bestLine=[f,t,...line]}if(score>alpha)alpha=score}}
+  catch(error){if(error!==SEARCH_TIMEOUT)throw error;break}
   if(bestLine.length>=2)completed={move:[bestLine[0],bestLine[1]],line:bestLine,score:bestScore,depth}}
  return completed}
 let analysisWorker=null,analysisRequestId=0;
@@ -418,8 +438,10 @@ function createAnalysisWorker(){if(typeof Worker==='undefined'||typeof Blob==='u
  const source=[
   `const N=${JSON.stringify(N)},KG=${JSON.stringify(KG)},VAL=${JSON.stringify(VAL)};`,
   pseudo.toString(),att.toString(),apply.toString(),inCheck.toString(),legal.toString(),
-  evalW.toString(),gen.toString(),search.toString(),analyzeBest.toString(),
-  `onmessage=event=>{const{id,state,depth}=event.data;try{postMessage({id,result:analyzeBest(state,depth)})}catch(error){postMessage({id,error:error.message})}};`
+  evalW.toString(),gen.toString(),positionKey.toString(),
+  `let searchDeadline=Infinity,searchTable=new Map(),searchNodes=0;const SEARCH_TIMEOUT={};`,
+  search.toString(),analyzeBest.toString(),
+  `onmessage=event=>{const{id,state,depth,timeLimit}=event.data;try{postMessage({id,result:analyzeBest(state,depth,timeLimit)})}catch(error){postMessage({id,error:error.message})}};`
  ].join('\n');
  try{const blob=new Blob([source],{type:'text/javascript'});analysisWorker=new Worker(URL.createObjectURL(blob));
   analysisWorker.onmessage=event=>{const pending=pendingAnalysis.get(event.data.id);if(!pending)return;pendingAnalysis.delete(event.data.id);
@@ -428,10 +450,11 @@ function createAnalysisWorker(){if(typeof Worker==='undefined'||typeof Blob==='u
    for(const pending of pendingAnalysis.values())pending.reject(new Error('Chess analysis worker failed'));pendingAnalysis.clear()};
   return analysisWorker
  }catch(error){console.error('Could not start chess analysis worker:',error);return null}}
-function requestAnalysis(state,depth){const worker=analysisWorker||createAnalysisWorker();
+function requestAnalysis(state,depth,timeLimit=1800){const worker=analysisWorker||createAnalysisWorker();
  if(!worker)return new Promise(resolve=>setTimeout(()=>resolve(analyzeBest(state,Math.min(depth,2))),0));
- return new Promise((resolve,reject)=>{const id=++analysisRequestId;pendingAnalysis.set(id,{resolve,reject});worker.postMessage({id,state,depth})})}
-async function pickAI(){const depth=[0,1,2,4][ai.lvl],result=await requestAnalysis(st,depth);return result?.move||null}
+ return new Promise((resolve,reject)=>{const id=++analysisRequestId;pendingAnalysis.set(id,{resolve,reject});worker.postMessage({id,state,depth,timeLimit})})}
+const AI_LEVELS={1:{depth:1,time:150},2:{depth:2,time:300},3:{depth:4,time:700},4:{depth:5,time:1500},5:{depth:6,time:3000},6:{depth:8,time:5000}};
+async function pickAI(){const level=AI_LEVELS[ai.lvl],result=await requestAnalysis(st,level.depth,level.time);return result?.move||null}
 function maybeAI(){if(!ai||over||thinking||!st||st.turn!==ai.c)return;thinking=true;const g=gid;setStatus('Computer is thinking…');
  setTimeout(async()=>{if(g!==gid||!ai){return}try{const m=await pickAI();if(g===gid&&m&&!over)doMove(m[0],m[1],false)}
   catch(error){console.error('Computer move failed:',error);if(g===gid)setStatus('Computer could not calculate a move. Please restart the game.')}
@@ -453,7 +476,7 @@ async function requestCoachHint(){const advice=$('coachAdvice'),button=$('coachH
  if(room&&st.turn!==myColor){advice.textContent='Wait for your turn before asking the coach.';return}
  if(over){advice.textContent='The game is over. Start or restart a game to get a new hint.';return}
  if(ai&&st.turn!==myColor){advice.textContent='Wait for your turn; the computer is thinking.';return}
- button.disabled=true;advice.textContent='Analyzing the position at Hard depth…';
+ button.disabled=true;advice.textContent='Analyzing the position…';
  await new Promise(resolve=>setTimeout(resolve,30));
  try{const position=st,gameId=room?.id,result=await requestAnalysis(position,4);
   if(st!==position||room?.id!==gameId){advice.textContent='The position changed. Request a fresh hint.';return}
@@ -494,7 +517,12 @@ $('playCoachBot').onclick=startCoachBot;
 $('clearCoach').onclick=()=>{coachMove=null;suggestedCoachMove=null;$('playCoachMove').disabled=true;clearCoachArrow();paint();$('coachAdvice').textContent='Hint cleared. Request another move whenever you need one.'};
 // ===== main menu =====
 function seg(id){const el=$(id);el.onclick=e=>{const b=e.target.closest('button');if(!b)return;[...el.children].forEach(x=>x.classList.remove('on'));b.classList.add('on')};return()=>el.querySelector('.on').dataset.v}
-const getLvl=seg('lvl'),getClr=seg('clr');
+const getLvl=()=>Number($('lvl').value),getClr=seg('clr');
+$('lvl').addEventListener('change',()=>{$('difficultyNote').textContent=[
+ '','Easy · looks a move ahead.','Medium · a balanced casual opponent.',
+ 'Hard · searches several moves ahead.','Expert · deeper tactical search.',
+ 'Immortal Expert · longer, deeper analysis.','Impossible · maximum search time and depth; still not literally unbeatable.'
+][getLvl()]});
 $('mAI').onclick=async()=>{await leave();let c=getClr();if(c==='r')c=Math.random()<.5?'w':'b';myColor=c;ai={c:c==='w'?'b':'w',lvl:+getLvl()};setGameActive(true);$('menu').classList.add('hide');newGame();face()};
 $('mLoc').onclick=()=>{$('menu').classList.add('hide');$('practice').onclick()};
 $('mOn').onclick=()=>{$('menu').classList.add('hide');setStatus('Host a room or enter your friend’s room code.');$('roomCode').focus()};
