@@ -129,7 +129,7 @@ button:disabled{opacity:.55;cursor:default}
 <button class="big g" id="mOn">Online multiplayer</button>
 <button class="big g" id="mLoc">Local 2-player</button><div class="profile-note">Profile: <span id="menuProfile"></span> · <button class="g" id="changeProfile" type="button">Change</button></div>
 </section></div></div>
-<div id="hud">Drag to orbit · scroll to zoom · tap to move</div>
+<div id="hud">Drag to orbit · pinch to zoom · tap to move</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 // ===== Chess engine =====
@@ -300,12 +300,21 @@ function tick(now){frameRequested=false;if(document.hidden)return;scheduleTick()
  cam.position.set(Math.sin(th)*Math.sin(ph)*rad,Math.cos(ph)*rad,Math.cos(th)*Math.sin(ph)*rad);cam.lookAt(0,.2,0);cam.updateMatrixWorld();updateCoachOverlay();R.render(S,cam)}
 document.addEventListener('visibilitychange',scheduleTick);
 // camera + input
-let th=0,ph=.95,rad=13,drag=null;const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
+let th=0,ph=.95,rad=13,drag=null,pinchDistance=0,gestureMoved=false;const pointers=new Map(),ray=new THREE.Raycaster(),mv=new THREE.Vector2();
 function size(){R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.fov=innerWidth<innerHeight?62:40;cam.updateProjectionMatrix()}addEventListener('resize',size);size();
 const cv=R.domElement;
-cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,moved:0};cv.setPointerCapture(e.pointerId)});
-cv.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.moved+=Math.abs(dx)+Math.abs(dy);th-=dx*.006;ph=Math.min(1.45,Math.max(.25,ph-dy*.005));drag.x=e.clientX;drag.y=e.clientY});
-cv.addEventListener('pointerup',e=>{if(drag&&drag.moved<6)pick(e);drag=null});
+const clampZoom=value=>Math.min(22,Math.max(7,value));
+const touchDistance=()=>{const [a,b]=pointers.values();return Math.hypot(a.x-b.x,a.y-b.y)};
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pointers.size===1){drag={x:e.clientX,y:e.clientY,moved:0,pointerId:e.pointerId};gestureMoved=false}
+ else{drag=null;gestureMoved=true;if(pointers.size===2)pinchDistance=touchDistance()}});
+cv.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pointers.size>=2){const distance=touchDistance();if(pinchDistance>0&&distance>0)rad=clampZoom(rad*pinchDistance/distance);pinchDistance=distance;gestureMoved=true;drag=null;return}
+ if(!drag||drag.pointerId!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.moved+=Math.abs(dx)+Math.abs(dy);th-=dx*.006;ph=Math.min(1.45,Math.max(.25,ph-dy*.005));drag.x=e.clientX;drag.y=e.clientY});
+function finishPointer(e){const tap=drag&&drag.pointerId===e.pointerId&&drag.moved<6&&!gestureMoved;
+ pointers.delete(e.pointerId);drag=null;pinchDistance=0;if(!pointers.size)gestureMoved=false;if(tap)pick(e)}
+cv.addEventListener('pointerup',finishPointer);
+cv.addEventListener('pointercancel',finishPointer);
 cv.addEventListener('wheel',e=>{rad=Math.min(22,Math.max(7,rad+e.deltaY*.01));e.preventDefault()},{passive:false});
 function pick(e){if(over||anim)return;mv.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(mv,cam);
  const hit=ray.intersectObjects([...pieces.children,...sqMesh],true)[0];if(!hit)return;let i;
